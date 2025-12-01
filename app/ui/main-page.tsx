@@ -282,16 +282,17 @@ toast.success("All decorations cleared, reverted to default");
       void node.offsetHeight;
       void node.offsetWidth;
 
-      // Wait for ALL images to load properly
+      // Wait for ALL images to load properly - increased attempts for mobile
       let allImagesLoaded = false;
       let attempts = 0;
-      const maxAttempts = 8;
+      const maxAttempts = 15; // Increased for mobile
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
       while (!allImagesLoaded && attempts < maxAttempts) {
         const imgs = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
         
         if (imgs.length === 0) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(resolve => setTimeout(resolve, isMobile ? 500 : 300));
           attempts++;
           continue;
         }
@@ -301,7 +302,7 @@ toast.success("All decorations cleared, reverted to default");
             const timeout = setTimeout(() => {
               console.warn('Image load timeout:', img.src);
               resolve();
-            }, 12000);
+            }, isMobile ? 15000 : 12000); // Longer timeout for mobile
 
             if (img.complete && img.naturalHeight > 0 && img.naturalWidth > 0) {
               clearTimeout(timeout);
@@ -323,24 +324,22 @@ toast.success("All decorations cleared, reverted to default");
               img.addEventListener('load', onLoad, { once: true });
               img.addEventListener('error', onError, { once: true });
 
-              // CRITICAL FIX: Don't reset src for Next.js Image components
-              // This causes cache issues where items get replaced with tree images
-              // Instead, just wait for the image to load naturally
-              if (!img.complete) {
-                // Force reload by adding cache busting parameter if needed
-                // But don't reset src completely as it breaks Next.js Image optimization
-                const url = new URL(img.src);
-                url.searchParams.set('_t', Date.now().toString());
-                // Only reload if image is really stuck
-                if (img.naturalWidth === 0 && img.naturalHeight === 0) {
-                  const originalSrc = img.src;
-                  // Use a different approach - clone the image
-                  const newImg = new Image();
-                  newImg.src = originalSrc;
-                  newImg.onload = () => {
-                    img.src = originalSrc;
-                  };
-                }
+              // On mobile, ensure image is actually loading
+              if (!img.complete && isMobile) {
+                // Force a small delay to let browser start loading
+                setTimeout(() => {
+                  if (!img.complete && img.naturalWidth === 0 && img.naturalHeight === 0) {
+                    // Image might be stuck, try to trigger load
+                    const originalSrc = img.src;
+                    const imgElement = img as HTMLImageElement;
+                    // Create new image to preload
+                    const preloadImg = new Image();
+                    preloadImg.onload = () => {
+                      // Image is ready, but don't change src to avoid cache issues
+                    };
+                    preloadImg.src = originalSrc;
+                  }
+                }, 100);
               }
             }
           });
@@ -348,35 +347,46 @@ toast.success("All decorations cleared, reverted to default");
 
         await Promise.all(imgLoadPromises);
         
-        const allLoaded = imgs.every(img => 
-          img.complete && img.naturalHeight > 0 && img.naturalWidth > 0
-        );
+        // More strict check - all images must be fully loaded
+        const allLoaded = imgs.every(img => {
+          const isLoaded = img.complete && img.naturalHeight > 0 && img.naturalWidth > 0;
+          if (!isLoaded && isMobile) {
+            console.log('Image not loaded:', {
+              src: img.src,
+              complete: img.complete,
+              naturalWidth: img.naturalWidth,
+              naturalHeight: img.naturalHeight
+            });
+          }
+          return isLoaded;
+        });
         
         if (allLoaded) {
           allImagesLoaded = true;
         } else {
           attempts++;
-          await new Promise(resolve => setTimeout(resolve, 400));
+          // Longer delay on mobile
+          await new Promise(resolve => setTimeout(resolve, isMobile ? 600 : 400));
         }
       }
 
-      // Wait for Rnd components
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for Rnd components - longer on mobile
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 800 : 500));
 
       // Wait for fonts
       if ((document as any).fonts?.ready) {
         try {
           await Promise.race([
             (document as any).fonts.ready,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Font timeout')), 3000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Font timeout')), isMobile ? 5000 : 3000))
           ]);
         } catch (err) {
           console.warn('Font loading timeout or failed', err);
         }
       }
 
-      // Extended delay to ensure ALL decoration items are fully rendered
-      await new Promise(resolve => setTimeout(resolve, 1200));
+      // Extended delay to ensure ALL decoration items are fully rendered - much longer on mobile
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 2000 : 1200));
 
       void node.offsetWidth;
       void node.offsetHeight;
@@ -421,34 +431,57 @@ toast.success("All decorations cleared, reverted to default");
         }
       }
       
-      // Wait for final render and verify srcs haven't changed
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait for final render and verify srcs haven't changed - longer on mobile
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 500 : 300));
       
       // Final verification before export - restore any incorrect srcs
       let needsReload = false;
-      for (const img of allImages) {
-        const itemId = img.getAttribute('data-item-id');
-        const expectedSrc = img.getAttribute('data-image-src');
-        
-        if (itemId && expectedSrc && imageSrcs.has(itemId)) {
-          const { expected } = imageSrcs.get(itemId)!;
-          if (!img.src.includes(expectedSrc)) {
-            console.error('Image src changed during export! Restoring...', {
-              itemId,
-              expected,
-              current: img.src
-            });
-            // Force restore correct src
-            img.src = expected;
-            needsReload = true;
+      let reloadCount = 0;
+      const maxReloadAttempts = isMobile ? 5 : 3;
+      
+      while (reloadCount < maxReloadAttempts) {
+        needsReload = false;
+        for (const img of allImages) {
+          const itemId = img.getAttribute('data-item-id');
+          const expectedSrc = img.getAttribute('data-image-src');
+          
+          if (itemId && expectedSrc && imageSrcs.has(itemId)) {
+            const { expected } = imageSrcs.get(itemId)!;
+            // Check if image is loaded AND src is correct
+            const isLoaded = img.complete && img.naturalHeight > 0 && img.naturalWidth > 0;
+            const srcCorrect = img.src.includes(expectedSrc);
+            
+            if (!isLoaded || !srcCorrect) {
+              if (!srcCorrect) {
+                console.error('Image src changed during export! Restoring...', {
+                  itemId,
+                  expected,
+                  current: img.src
+                });
+                // Force restore correct src
+                img.src = expected;
+              }
+              needsReload = true;
+            }
           }
         }
+        
+        if (!needsReload) {
+          break; // All images are correct
+        }
+        
+        reloadCount++;
+        // Wait longer on mobile for images to reload
+        await new Promise(resolve => setTimeout(resolve, isMobile ? 500 : 300));
+        
+        // Re-check all images
+        const currentImages = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
+        allImages.length = 0;
+        allImages.push(...currentImages);
       }
       
-      // Extra wait to ensure all images are restored if any were fixed
-      if (needsReload) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
+      // Final wait after all fixes - critical for mobile
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 800 : 400));
 
       // Suppress CSS rules SecurityError
       const originalCSSRulesGetter = Object.getOwnPropertyDescriptor(CSSStyleSheet.prototype, 'cssRules')?.get;
@@ -584,24 +617,94 @@ toast.success("All decorations cleared, reverted to default");
 
       const quote = "I'm in for Week 1 of #RitualXmas\n\nNow it's your turn Ritualist, the holiday magic start with you\n\n@ritualnet @ritualfnd";
       
-      try {
-        const response = await fetch(freshImageUrl);
-        const blob = await response.blob();
-        
-        if (navigator.clipboard?.write) {
-          await navigator.clipboard.write([
-            new ClipboardItem({ 'image/png': blob }),
-          ]);
+      // Detect mobile device
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // Mobile: Try Web Share API first, then fallback to Twitter app/web
+        try {
+          const response = await fetch(freshImageUrl);
+          const blob = await response.blob();
+          const file = new File([blob], 'xmas-decorate.png', { type: 'image/png' });
+          
+          // Try Web Share API with file (iOS Safari, Chrome Android)
+          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              title: 'My Christmas Decoration',
+              text: quote,
+              files: [file]
+            });
+            toast.success('Shared successfully!');
+            setExportModalOpen(false);
+            return;
+          }
+        } catch (shareErr) {
+          console.log('Web Share API not available or failed, trying Twitter:', shareErr);
         }
-      } catch (clipboardErr) {
-        console.warn('Could not copy image to clipboard:', clipboardErr);
+        
+        // Fallback: Copy to clipboard and open Twitter
+        try {
+          const response = await fetch(freshImageUrl);
+          const blob = await response.blob();
+          
+          if (navigator.clipboard?.write) {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob }),
+            ]);
+          }
+        } catch (clipboardErr) {
+          console.warn('Could not copy image to clipboard:', clipboardErr);
+        }
+        
+        // Open Twitter app or web on mobile
+        // Try Twitter app first (twitter://), then web (https://twitter.com)
+        const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(quote)}`;
+        
+        // Try to open Twitter app
+        const twitterAppUrl = `twitter://post?message=${encodeURIComponent(quote)}`;
+        const twitterIntentUrl = `twitter://intent/tweet?text=${encodeURIComponent(quote)}`;
+        
+        // Try multiple methods to open Twitter on mobile
+        let opened = false;
+        
+        // Method 1: Try Twitter app intent
+        try {
+          window.location.href = twitterIntentUrl;
+          opened = true;
+          // Wait a bit to see if it opens
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (e) {
+          // If app doesn't open, continue to web
+        }
+        
+        // Method 2: Open Twitter web if app didn't open
+        if (!opened) {
+          window.open(tweetUrl, '_blank');
+        }
+        
+        toast.success('X opened! Image copied to clipboard - tap and hold in the tweet box, then paste the image');
+        setExportModalOpen(false);
+      } else {
+        // Desktop: Copy to clipboard and open Twitter web
+        try {
+          const response = await fetch(freshImageUrl);
+          const blob = await response.blob();
+          
+          if (navigator.clipboard?.write) {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob }),
+            ]);
+          }
+        } catch (clipboardErr) {
+          console.warn('Could not copy image to clipboard:', clipboardErr);
+        }
+        
+        const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(quote)}`;
+        window.open(tweetUrl, '_blank');
+        
+        toast.success('X opened! Image copied to clipboard - press Ctrl+V to paste into your tweet');
+        setExportModalOpen(false);
       }
-      
-      const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(quote)}`;
-      window.open(tweetUrl, '_blank');
-      
-      toast.success('X opened! Image copied to clipboard - press Ctrl+V to paste into your tweet');
-      setExportModalOpen(false);
     } catch (err) {
       console.error('Share failed:', err);
       const quote = "I'm in for Week 1 of #RitualXmas\n\nNow it's your turn Ritualist, the holiday magic start with you\n\n@ritualnet @ritualfnd";

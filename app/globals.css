@@ -82,20 +82,20 @@ body {
 /* Mobile adjustments for Merry Christmas text */
 @media (max-width: 768px) {
   .blink-red-yellow {
-    font-size: 1.8rem;
-    padding: 8px 15px;
-    letter-spacing: 1px;
-    top: 50px;
+    font-size: 2.4rem;
+    padding: 10px 20px;
+    letter-spacing: 1.5px;
+    top: 80px;
     border-radius: 12px;
   }
 }
 
 @media (max-width: 480px) {
   .blink-red-yellow {
-    font-size: 1.4rem;
-    padding: 6px 12px;
-    letter-spacing: 0.5px;
-    top: 45px;
+    font-size: 2rem;
+    padding: 8px 18px;
+    letter-spacing: 1px;
+    top: 70px;
     border-radius: 10px;
   }
 }
