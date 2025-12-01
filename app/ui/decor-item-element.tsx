@@ -1,7 +1,7 @@
 import { DraggableEventHandler } from "react-draggable";
 import { DraggableItem } from "@/app/lib/definitions";
 import { Rnd, RndResizeCallback } from "react-rnd";
-import { MouseEventHandler, TouchEventHandler } from "react";
+import { MouseEventHandler, TouchEventHandler, WheelEventHandler } from "react";
 import Image from "next/image";
 import { prefix } from "@/app/lib/prefix";
 
@@ -10,14 +10,27 @@ export default function DecorItemElement({
   onDragStop,
   onResizeStop,
   onDoubleClick,
-  onTouchStart
+  onTouchStart,
+  onRotate // Thêm prop mới
 }: {
   item: DraggableItem,
   onDragStop: DraggableEventHandler,
   onResizeStop: RndResizeCallback,
   onDoubleClick: MouseEventHandler<HTMLImageElement>,
-  onTouchStart: TouchEventHandler<HTMLImageElement>
+  onTouchStart: TouchEventHandler<HTMLImageElement>,
+  onRotate: (id: number, delta: number) => void // Thêm type
 }) {
+  const handleWheel: WheelEventHandler<HTMLDivElement> = (e) => {
+    // Chỉ xoay khi giữ Shift
+    if (e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Xoay 15 độ mỗi lần scroll
+      const delta = e.deltaY > 0 ? 15 : -15;
+      onRotate(item.id, delta);
+    }
+  };
+
   return (
     <Rnd
       size={{
@@ -28,18 +41,20 @@ export default function DecorItemElement({
         x: item.x,
         y: item.y
       }}
-      // Allow resizing without artificial max limits while keeping
-      // movement behavior; the parent container already has
-      // `overflow-hidden` so oversized items will be clipped visually.
-      // Removing `bounds="parent"` lets users resize larger than the
-      // parent while still rendering only the visible portion.
       onDragStop={onDragStop}
       onResizeStop={onResizeStop}
       minWidth={1}
       minHeight={1}
       className="hover:border-2 hover:border-gray-400 active:border-2 active:border-gray-400"
     >
-      <div className="relative w-full h-full">
+      <div 
+        className="relative w-full h-full"
+        onWheel={handleWheel}
+        style={{
+          transform: `rotate(${item.rotation}deg)`,
+          transformOrigin: 'center center'
+        }}
+      >
         <Image
           id={`${item.id}`}
           src={`${prefix}/${item.imageSrc}`}
@@ -53,6 +68,7 @@ export default function DecorItemElement({
           onDoubleClick={onDoubleClick}
           onTouchStart={onTouchStart}
         />
+        
       </div>
     </Rnd>
   );

@@ -13,7 +13,8 @@ export default function DecorBox({
   onDragStop,
   onResizeStop,
   onDoubleClick,
-  onTouchStart
+  onTouchStart,
+  onRotate // Thêm prop mới
 }: {
   tree: string,
   decorItems: DraggableItem[],
@@ -21,17 +22,16 @@ export default function DecorBox({
   onDragStop: DraggableEventHandler,
   onResizeStop: RndResizeCallback,
   onDoubleClick: MouseEventHandler<HTMLImageElement>,
-  onTouchStart: TouchEventHandler<HTMLImageElement>
+  onTouchStart: TouchEventHandler<HTMLImageElement>,
+  onRotate: (id: number, delta: number) => void // Thêm type
 }) {
   return (
     <div ref={exportNodeRef} className="w-full h-full relative">
-      {/* Background color */}
       <div
         className="absolute inset-0"
         style={{ backgroundColor: '#0B6E4F' }}
       />
       
-      {/* Main tree image */}
       <div className="relative w-full h-full">
         <Image
           src={`${prefix}/${tree}`}
@@ -44,7 +44,7 @@ export default function DecorBox({
           draggable={false}
         />
       </div>
-      {/* Render current decoration items */}
+      
       {decorItems.map((item) => (
         <DecorItemElement
           key={`decor-el-${item.id}`}
@@ -53,6 +53,7 @@ export default function DecorBox({
           onResizeStop={onResizeStop}
           onDoubleClick={onDoubleClick}
           onTouchStart={onTouchStart}
+          onRotate={onRotate} // Truyền prop
         />
       ))}
     </div>

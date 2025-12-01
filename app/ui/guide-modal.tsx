@@ -56,6 +56,7 @@ export default function GuideModal({
               <p className="text-gray-600 text-sm">
                 - Drag and drop to move items<br/>
                 - Drag corners to resize<br/>
+                - Hold Shift + Scroll to rotate items<br/>
                 - Double click (or double tap on mobile) to remove an item
               </p>
             </div>

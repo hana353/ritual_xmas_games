@@ -67,16 +67,27 @@ export default function MainPage({
     }
   }, [selectedMenu]);
 
-  function addDecorItem(imgLink: string) {
-    const newDecorItem: DraggableItem = {
-      id: nextId,
-      imageSrc: imgLink,
-      x: 0, y: 0,
-      width: 200, height: 200
-    };
-    setDecorItems([...decorItems, newDecorItem]);
-    setNextId(nextId + 1);
-  }
+  function handleRotate(id: number, delta: number) {
+  setDecorItems(decorItems.map(item => {
+    if (item.id === id) {
+      return { ...item, rotation: (item.rotation + delta) % 360 };
+    }
+    return item;
+  }));
+}
+
+// Cập nhật hàm addDecorItem để thêm rotation mặc định:
+function addDecorItem(imgLink: string) {
+  const newDecorItem: DraggableItem = {
+    id: nextId,
+    imageSrc: imgLink,
+    x: 0, y: 0,
+    width: 200, height: 200,
+    rotation: 0 // Thêm rotation mặc định
+  };
+  setDecorItems([...decorItems, newDecorItem]);
+  setNextId(nextId + 1);
+}
 
   function deleteDecorItem(e: React.MouseEvent<HTMLImageElement>) {
     setDecorItems(decorItems.filter(item => item.id !== Number(e.currentTarget.id)));
@@ -649,6 +660,8 @@ toast.info('X opened! Please upload the image manually');
           onResizeStop={handleResizeStop}
           onDoubleClick={deleteDecorItem}
           onTouchStart={deleteItemOnDoubleTouch}
+            onRotate={handleRotate} // Thêm prop
+
         />
       </div>
 
