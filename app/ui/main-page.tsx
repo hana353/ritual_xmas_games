@@ -185,18 +185,53 @@ toast.success("All decorations cleared, reverted to default");
     setExportedImageUrl(null);
     setExportModalOpen(false);
     
-    // Wait for state to update and modal to be ready
-    await new Promise(resolve => setTimeout(resolve, 150));
+    // Reduced delay - only wait for state to update
+    await new Promise(resolve => setTimeout(resolve, 50));
     
-    // Force clear Next.js Image cache by reloading all images
+    // Force clear Next.js Image cache by reloading all images (optimized)
     if (exportNodeRef.current) {
       const allImages = Array.from(exportNodeRef.current.querySelectorAll('img')) as HTMLImageElement[];
+      const reloadPromises: Promise<void>[] = [];
+      const expectedTreeSrc = `${prefix}/${currentTree}`;
+      
       for (const img of allImages) {
         const itemId = img.getAttribute('data-item-id');
         const expectedSrc = img.getAttribute('data-image-src');
         
-        // Only reload decoration items, not tree background
-        if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '') {
+        // Check if this is tree image (no data-item-id, but src matches currentTree)
+        const isTreeImage = !itemId && (img.src.includes(currentTree) || img.alt === 'Decoration tree');
+        
+        if (isTreeImage) {
+          // Force reload tree image with cache busting
+          const cacheBuster = `?cb=${Date.now()}-tree`;
+          const treeSrcWithCacheBuster = expectedTreeSrc + cacheBuster;
+          const reloadPromise = new Promise<void>((resolve) => {
+            img.src = treeSrcWithCacheBuster;
+            setTimeout(() => {
+              img.src = expectedTreeSrc;
+              // Wait for tree image to load
+              if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+                resolve();
+              } else {
+                const onLoad = () => {
+                  img.removeEventListener('load', onLoad);
+                  img.removeEventListener('error', onError);
+                  resolve();
+                };
+                const onError = () => {
+                  img.removeEventListener('load', onLoad);
+                  img.removeEventListener('error', onError);
+                  resolve();
+                };
+                img.addEventListener('load', onLoad, { once: true });
+                img.addEventListener('error', onError, { once: true });
+                setTimeout(() => resolve(), 2000);
+              }
+            }, 50);
+          });
+          reloadPromises.push(reloadPromise);
+        } else if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '') {
+          // Reload decoration items
           const fullExpectedSrc = `${prefix}/${expectedSrc}`;
           // Add cache busting parameter to force reload
           const cacheBuster = `?cb=${Date.now()}`;
@@ -205,22 +240,31 @@ toast.success("All decorations cleared, reverted to default");
           if (currentSrc !== fullExpectedSrc + cacheBuster) {
             img.src = fullExpectedSrc + cacheBuster;
             // Wait a bit then restore to normal src (without cache buster for export)
-            setTimeout(() => {
-              img.src = fullExpectedSrc;
-            }, 50);
+            const reloadPromise = new Promise<void>((resolve) => {
+              setTimeout(() => {
+                img.src = fullExpectedSrc;
+                resolve();
+              }, 30); // Reduced from 50ms
+            });
+            reloadPromises.push(reloadPromise);
           }
         }
       }
-      // Wait for images to start reloading
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait for all reloads to complete (parallel instead of sequential)
+      if (reloadPromises.length > 0) {
+        await Promise.all(reloadPromises);
+      }
+      // Reduced wait time
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
     const dataUrl = await exportImageToDataUrl();
     
     if (dataUrl) {
-      // Set the new image
+      // Set the new image and open modal immediately - no additional delay
       setExportedImageUrl(dataUrl);
       setExportModalOpen(true);
+      // Image will load in modal, no need to wait
       toast.success('Image ready!');
     }
   }
@@ -410,15 +454,57 @@ toast.success("All decorations cleared, reverted to default");
       // Don't reset src as it causes Next.js Image cache issues where items get replaced with tree
       const allImages = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
       const imageSrcs = new Map<string, { expected: string; current: string }>();
+      const expectedTreeSrc = `${prefix}/${currentTree}`;
       
        // Store expected srcs from data attributes to verify they don't change
-       // Only check images with data attributes (decoration items), skip tree background
+       // Check both decoration items and tree image
        for (const img of allImages) {
          const itemId = img.getAttribute('data-item-id');
          const expectedSrc = img.getAttribute('data-image-src');
+         const isTreeImage = !itemId && (img.src.includes(currentTree) || img.alt === 'Decoration tree');
          
-         // Only process decoration items with valid data attributes
-         if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '') {
+         // Verify tree image first
+         if (isTreeImage) {
+           const currentSrc = img.src || '';
+           const treeSrcCorrect = currentSrc.includes(currentTree) || 
+                                 currentSrc === expectedTreeSrc ||
+                                 currentSrc.includes(encodeURIComponent(currentTree));
+           
+           if (!treeSrcCorrect || !img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+             console.warn('Tree image not correct or not loaded, fixing...', {
+               expected: expectedTreeSrc,
+               current: currentSrc,
+               complete: img.complete,
+               naturalWidth: img.naturalWidth,
+               naturalHeight: img.naturalHeight
+             });
+             // Force reload tree image
+             const cacheBuster = `?cb=${Date.now()}-tree`;
+             img.src = expectedTreeSrc + cacheBuster;
+             await new Promise(resolve => setTimeout(resolve, 100));
+             img.src = expectedTreeSrc;
+             await new Promise<void>((resolve) => {
+               if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+                 resolve();
+               } else {
+                 const onLoad = () => {
+                   img.removeEventListener('load', onLoad);
+                   img.removeEventListener('error', onError);
+                   resolve();
+                 };
+                 const onError = () => {
+                   img.removeEventListener('load', onLoad);
+                   img.removeEventListener('error', onError);
+                   resolve();
+                 };
+                 img.addEventListener('load', onLoad, { once: true });
+                 img.addEventListener('error', onError, { once: true });
+                 setTimeout(() => resolve(), 2000);
+               }
+             });
+           }
+         } else if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '') {
+           // Only process decoration items with valid data attributes
            const fullExpectedSrc = `${prefix}/${expectedSrc}`;
            imageSrcs.set(itemId, { expected: fullExpectedSrc, current: img.src });
            
@@ -515,9 +601,60 @@ toast.success("All decorations cleared, reverted to default");
         for (const img of allImages) {
           const itemId = img.getAttribute('data-item-id');
           const expectedSrc = img.getAttribute('data-image-src');
+          const isTreeImage = !itemId && (img.src.includes(currentTree) || img.alt === 'Decoration tree');
           
-          // Only process images with valid data attributes
-          if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '' && imageSrcs.has(itemId)) {
+          // Verify tree image
+          if (isTreeImage) {
+            const currentSrc = img.src || '';
+            const treeSrcCorrect = currentSrc.includes(currentTree) || 
+                                  currentSrc === expectedTreeSrc ||
+                                  currentSrc.includes(encodeURIComponent(currentTree));
+            const isLoaded = img.complete && img.naturalHeight > 0 && img.naturalWidth > 0;
+            
+            if (!isLoaded || !treeSrcCorrect) {
+              if (!treeSrcCorrect && currentSrc !== '') {
+                console.warn('Tree image src changed during export! Restoring...', {
+                  expected: expectedTreeSrc,
+                  current: currentSrc
+                });
+                // Force restore correct tree src
+                const cacheBuster = `?cb=${Date.now()}-tree`;
+                const expectedWithCacheBuster = expectedTreeSrc + cacheBuster;
+                
+                const reloadPromise = new Promise<void>((resolve) => {
+                  img.src = expectedWithCacheBuster;
+                  if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+                    img.src = expectedTreeSrc;
+                    resolve();
+                  } else {
+                    const onLoad = () => {
+                      img.removeEventListener('load', onLoad);
+                      img.removeEventListener('error', onError);
+                      img.src = expectedTreeSrc;
+                      resolve();
+                    };
+                    const onError = () => {
+                      img.removeEventListener('load', onLoad);
+                      img.removeEventListener('error', onError);
+                      img.src = expectedTreeSrc;
+                      resolve();
+                    };
+                    img.addEventListener('load', onLoad, { once: true });
+                    img.addEventListener('error', onError, { once: true });
+                    setTimeout(() => {
+                      img.removeEventListener('load', onLoad);
+                      img.removeEventListener('error', onError);
+                      img.src = expectedTreeSrc;
+                      resolve();
+                    }, 3000);
+                  }
+                });
+                reloadPromises.push(reloadPromise);
+              }
+              needsReload = true;
+            }
+          } else if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '' && imageSrcs.has(itemId)) {
+            // Only process images with valid data attributes
             const { expected } = imageSrcs.get(itemId)!;
             // Check if image is loaded AND src is correct
             const isLoaded = img.complete && img.naturalHeight > 0 && img.naturalWidth > 0;
@@ -617,8 +754,45 @@ toast.success("All decorations cleared, reverted to default");
       for (const img of finalImages) {
         const itemId = img.getAttribute('data-item-id');
         const expectedSrc = img.getAttribute('data-image-src');
+        const isTreeImage = !itemId && (img.src.includes(currentTree) || img.alt === 'Decoration tree');
         
-        if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '' && imageSrcs.has(itemId)) {
+        // Verify tree image in final check
+        if (isTreeImage) {
+          const currentSrc = img.src || '';
+          const treeSrcCorrect = currentSrc.includes(currentTree) || 
+                                currentSrc === expectedTreeSrc ||
+                                currentSrc.includes(encodeURIComponent(currentTree));
+          const isLoaded = img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
+          
+          if (!treeSrcCorrect || !isLoaded) {
+            finalNeedsFix = true;
+            const cacheBuster = `?cb=${Date.now()}-tree`;
+            const fixPromise = new Promise<void>((resolve) => {
+              img.src = expectedTreeSrc + cacheBuster;
+              const onLoad = () => {
+                img.removeEventListener('load', onLoad);
+                img.removeEventListener('error', onError);
+                img.src = expectedTreeSrc;
+                resolve();
+              };
+              const onError = () => {
+                img.removeEventListener('load', onLoad);
+                img.removeEventListener('error', onError);
+                img.src = expectedTreeSrc;
+                resolve();
+              };
+              img.addEventListener('load', onLoad, { once: true });
+              img.addEventListener('error', onError, { once: true });
+              setTimeout(() => {
+                img.removeEventListener('load', onLoad);
+                img.removeEventListener('error', onError);
+                img.src = expectedTreeSrc;
+                resolve();
+              }, 2000);
+            });
+            finalFixPromises.push(fixPromise);
+          }
+        } else if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '' && imageSrcs.has(itemId)) {
           const { expected } = imageSrcs.get(itemId)!;
           const currentSrc = img.src || '';
           const srcCorrect = currentSrc.includes(expectedSrc) || 
