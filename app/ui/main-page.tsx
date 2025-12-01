@@ -309,17 +309,17 @@ toast.success("All decorations cleared, reverted to default");
       void node.offsetHeight;
       void node.offsetWidth;
 
-      // Wait for ALL images to load properly - optimized for mobile speed
+      // Wait for ALL images to load properly - increased reliability for mobile
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       let allImagesLoaded = false;
       let attempts = 0;
-      const maxAttempts = isMobile ? 8 : 6; // Reduced for faster export
+      const maxAttempts = isMobile ? 12 : 8; // Increased for mobile reliability
 
       while (!allImagesLoaded && attempts < maxAttempts) {
         const imgs = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
         
         if (imgs.length === 0) {
-          await new Promise(resolve => setTimeout(resolve, isMobile ? 200 : 150));
+          await new Promise(resolve => setTimeout(resolve, isMobile ? 400 : 200));
           attempts++;
           continue;
         }
@@ -329,7 +329,7 @@ toast.success("All decorations cleared, reverted to default");
             const timeout = setTimeout(() => {
               console.warn('Image load timeout:', img.src);
               resolve();
-            }, isMobile ? 6000 : 5000); // Reduced timeout for faster export
+            }, isMobile ? 10000 : 8000); // Increased timeout for mobile reliability
 
             if (img.complete && img.naturalHeight > 0 && img.naturalWidth > 0) {
               clearTimeout(timeout);
@@ -380,13 +380,13 @@ toast.success("All decorations cleared, reverted to default");
           allImagesLoaded = true;
         } else {
           attempts++;
-          // Reduced delay for faster export
-          await new Promise(resolve => setTimeout(resolve, isMobile ? 250 : 200));
+          // Increased delay for mobile reliability
+          await new Promise(resolve => setTimeout(resolve, isMobile ? 500 : 300));
         }
       }
 
-      // Wait for Rnd components - optimized for speed
-      await new Promise(resolve => setTimeout(resolve, isMobile ? 300 : 200));
+      // Wait for Rnd components - increased for mobile reliability
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 600 : 300));
 
       // Wait for fonts - optimized timeout
       if ((document as any).fonts?.ready) {
@@ -400,8 +400,8 @@ toast.success("All decorations cleared, reverted to default");
         }
       }
 
-      // Reduced delay to ensure ALL decoration items are fully rendered - optimized for speed
-      await new Promise(resolve => setTimeout(resolve, isMobile ? 600 : 400));
+      // Increased delay to ensure ALL decoration items are fully rendered - critical for mobile
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 1200 : 600));
 
       void node.offsetWidth;
       void node.offsetHeight;
@@ -500,13 +500,13 @@ toast.success("All decorations cleared, reverted to default");
          // Skip images without data attributes (like tree background) - they're fine
        }
       
-      // Wait for final render and verify srcs haven't changed - increased for reliability
-      await new Promise(resolve => setTimeout(resolve, isMobile ? 400 : 300));
+      // Wait for final render and verify srcs haven't changed - increased for mobile reliability
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 600 : 400));
       
       // Final verification before export - restore any incorrect srcs with proper loading
       let needsReload = false;
       let reloadCount = 0;
-      const maxReloadAttempts = isMobile ? 3 : 3; // Increased attempts for reliability
+      const maxReloadAttempts = isMobile ? 5 : 3; // Increased attempts for mobile reliability
       
       while (reloadCount < maxReloadAttempts) {
         needsReload = false;
@@ -588,8 +588,8 @@ toast.success("All decorations cleared, reverted to default");
         // Wait for all reloads to complete
         if (reloadPromises.length > 0) {
           await Promise.all(reloadPromises);
-          // Additional wait to ensure images are fully rendered
-          await new Promise(resolve => setTimeout(resolve, isMobile ? 400 : 300));
+          // Additional wait to ensure images are fully rendered - increased for mobile
+          await new Promise(resolve => setTimeout(resolve, isMobile ? 800 : 500));
         }
         
         if (!needsReload) {
@@ -597,8 +597,8 @@ toast.success("All decorations cleared, reverted to default");
         }
         
         reloadCount++;
-        // Wait before re-checking
-        await new Promise(resolve => setTimeout(resolve, isMobile ? 300 : 200));
+        // Wait before re-checking - increased for mobile
+        await new Promise(resolve => setTimeout(resolve, isMobile ? 600 : 300));
         
         // Re-check all images
         const currentImages = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
@@ -606,11 +606,14 @@ toast.success("All decorations cleared, reverted to default");
         allImages.push(...currentImages);
       }
       
-      // Final wait after all fixes - increased for reliability
-      await new Promise(resolve => setTimeout(resolve, isMobile ? 500 : 400));
+      // Final wait after all fixes - increased for mobile reliability
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 800 : 500));
       
-      // One more verification pass to ensure all images are correct
+      // One more comprehensive verification pass to ensure all images are correct and loaded
       const finalImages = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
+      let finalNeedsFix = false;
+      const finalFixPromises: Promise<void>[] = [];
+      
       for (const img of finalImages) {
         const itemId = img.getAttribute('data-item-id');
         const expectedSrc = img.getAttribute('data-image-src');
@@ -622,6 +625,7 @@ toast.success("All decorations cleared, reverted to default");
                             currentSrc.includes(encodeURIComponent(expectedSrc)) ||
                             currentSrc.endsWith(expectedSrc) ||
                             currentSrc === expected;
+          const isLoaded = img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
           
           if (!srcCorrect && currentSrc !== '') {
             console.warn('Final check: Image src still incorrect, forcing restore:', {
@@ -629,19 +633,86 @@ toast.success("All decorations cleared, reverted to default");
               expected,
               current: currentSrc
             });
+            finalNeedsFix = true;
             // Use cache busting to force reload
             const cacheBuster = `?cb=${Date.now()}-${itemId}`;
-            img.src = expected + cacheBuster;
-            // Wait a bit then set to final src
-            setTimeout(() => {
-              img.src = expected;
-            }, 100);
+            const fixPromise = new Promise<void>((resolve) => {
+              img.src = expected + cacheBuster;
+              const onLoad = () => {
+                img.removeEventListener('load', onLoad);
+                img.removeEventListener('error', onError);
+                img.src = expected;
+                resolve();
+              };
+              const onError = () => {
+                img.removeEventListener('load', onLoad);
+                img.removeEventListener('error', onError);
+                img.src = expected;
+                resolve();
+              };
+              img.addEventListener('load', onLoad, { once: true });
+              img.addEventListener('error', onError, { once: true });
+              setTimeout(() => {
+                img.removeEventListener('load', onLoad);
+                img.removeEventListener('error', onError);
+                img.src = expected;
+                resolve();
+              }, 2000);
+            });
+            finalFixPromises.push(fixPromise);
+          } else if (!isLoaded) {
+            // Image src is correct but not loaded yet
+            finalNeedsFix = true;
+            const waitPromise = new Promise<void>((resolve) => {
+              if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+                resolve();
+              } else {
+                const onLoad = () => {
+                  img.removeEventListener('load', onLoad);
+                  img.removeEventListener('error', onError);
+                  resolve();
+                };
+                const onError = () => {
+                  img.removeEventListener('load', onLoad);
+                  img.removeEventListener('error', onError);
+                  resolve();
+                };
+                img.addEventListener('load', onLoad, { once: true });
+                img.addEventListener('error', onError, { once: true });
+                setTimeout(() => resolve(), 3000);
+              }
+            });
+            finalFixPromises.push(waitPromise);
           }
         }
       }
       
-      // Final wait after last verification
-      await new Promise(resolve => setTimeout(resolve, isMobile ? 400 : 300));
+      // Wait for all final fixes to complete
+      if (finalFixPromises.length > 0) {
+        await Promise.all(finalFixPromises);
+        // Additional wait after final fixes
+        await new Promise(resolve => setTimeout(resolve, isMobile ? 600 : 400));
+      }
+      
+      // Final wait after last verification - increased for mobile
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 600 : 400));
+      
+      // One last check to ensure all images are loaded
+      const lastCheckImages = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
+      const allFinalLoaded = lastCheckImages.every(img => {
+        const itemId = img.getAttribute('data-item-id');
+        if (itemId && itemId.trim() !== '') {
+          // Only check decoration items
+          return img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
+        }
+        return true; // Skip tree background
+      });
+      
+      if (!allFinalLoaded && isMobile) {
+        // On mobile, wait a bit more if not all loaded
+        console.warn('Some images still not fully loaded, waiting a bit more...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
 
       // Suppress CSS rules SecurityError
       const originalCSSRulesGetter = Object.getOwnPropertyDescriptor(CSSStyleSheet.prototype, 'cssRules')?.get;
