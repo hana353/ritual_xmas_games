@@ -10,14 +10,13 @@ export default function DecorItem({
 }) {
   return (
     <button
-      className="bg-blue-500/50 w-16 h-16 m-3 inline-block cursor-pointer"
+      className="bg-blue-500/50 w-16 h-16 m-3 inline-block cursor-pointer flex items-center justify-center overflow-hidden"
       onClick={handleOnClick}
     >
       <img
         src={`${prefix}/${imageSrc}`}
         alt="Decoration item"
-        width={100} height={100}
-        className="overflow-hidden"
+        className="w-full h-full object-contain"
       />
     </button>
   );

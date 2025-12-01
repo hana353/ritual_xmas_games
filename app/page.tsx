@@ -7,7 +7,7 @@ export default function Home() {
   // --- TREES ---
   // Bạn có 4 folder tree: 1,2,3,4
   // Mỗi folder có 4 file: 1.1.png → 1.4.png
-  const treeLinks: string[] = Array.from({ length: 4 }, (_, folderIndex) =>
+  const treeLinks: string[] = Array.from({ length: 5 }, (_, folderIndex) =>
     Array.from({ length: 4 }, (_, imgIndex) =>
       `trees/${folderIndex + 1}/${folderIndex + 1}.${imgIndex + 1}.png`
     )

@@ -13,6 +13,7 @@ import ExportModal from "@/app/ui/export-modal";
 import CapturingModal from "@/app/ui/capturing-modal";
 import GuideModal from "@/app/ui/guide-modal";
 import Snowfall from "react-snowfall";
+import { prefix } from "@/app/lib/prefix";
 
 export default function MainPage({
   treeLinks,
@@ -90,16 +91,23 @@ function addDecorItem(imgLink: string) {
 }
 
   function deleteDecorItem(e: React.MouseEvent<HTMLImageElement>) {
-    setDecorItems(decorItems.filter(item => item.id !== Number(e.currentTarget.id)));
+    const img = e.currentTarget;
+    const itemId = img.getAttribute('data-item-id');
+    const modifiedId = itemId ? Number(itemId) : (img.id.startsWith('decor-item-') ? Number(img.id.replace('decor-item-', '')) : Number(img.id));
+    setDecorItems(decorItems.filter(item => item.id !== modifiedId));
   }
 
   function deleteItemOnDoubleTouch(e: React.TouchEvent<HTMLImageElement>) {
     if (e.touches.length === 1) {
+      const img = e.currentTarget;
+      const itemId = img.getAttribute('data-item-id');
+      const modifiedId = itemId ? Number(itemId) : (img.id.startsWith('decor-item-') ? Number(img.id.replace('decor-item-', '')) : Number(img.id));
+      
       if (!touchExpiration) {
         setTouchExpiration(e.timeStamp + 400);
       } else if (e.timeStamp <= touchExpiration) {
         // Reset for other double touch events
-        setDecorItems(decorItems.filter(item => item.id !== Number(e.currentTarget.id)));
+        setDecorItems(decorItems.filter(item => item.id !== modifiedId));
         setTouchExpiration(0);
       } else {
         // Second touch expired
@@ -111,7 +119,10 @@ function addDecorItem(imgLink: string) {
   function handleDragStop(e: DraggableEvent, data: DraggableData) {
     const imgNode = data.node.querySelector("img");
     if (!imgNode) return;
-    const modifiedId = Number(imgNode.id);
+    
+    // Get item ID from data attribute or parse from id
+    const itemId = imgNode.getAttribute('data-item-id');
+    const modifiedId = itemId ? Number(itemId) : (imgNode.id.startsWith('decor-item-') ? Number(imgNode.id.replace('decor-item-', '')) : Number(imgNode.id));
 
     setDecorItems(decorItems.map(item => {
       if (item.id === modifiedId) {
@@ -125,7 +136,10 @@ function addDecorItem(imgLink: string) {
   function handleResizeStop(e: MouseEvent | TouchEvent, direction: ResizeDirection, ref: HTMLElement, delta: ResizableDelta, position: Position) {
     const imgNode = ref.querySelector("img");
     if (!imgNode) return;
-    const modifiedId = Number(imgNode.id);
+    
+    // Get item ID from data attribute or parse from id
+    const itemId = imgNode.getAttribute('data-item-id');
+    const modifiedId = itemId ? Number(itemId) : (imgNode.id.startsWith('decor-item-') ? Number(imgNode.id.replace('decor-item-', '')) : Number(imgNode.id));
 
     setDecorItems(decorItems.map(item => {
       if (item.id === modifiedId) {
@@ -157,8 +171,6 @@ toast.success("All decorations cleared, reverted to default");
   }
 
   async function handleExport() {
-    if (!exportNodeRef.current || isExporting) return;
-
     // CRITICAL FIX: Clear previous export completely before starting new one
     setExportedImageUrl(null);
     setExportModalOpen(false);
@@ -166,6 +178,65 @@ toast.success("All decorations cleared, reverted to default");
     // Wait for state to update and modal to be ready
     await new Promise(resolve => setTimeout(resolve, 150));
     
+    const dataUrl = await exportImageToDataUrl();
+    
+    if (dataUrl) {
+      // Set the new image
+      setExportedImageUrl(dataUrl);
+      setExportModalOpen(true);
+      toast.success('Image ready!');
+    }
+  }
+
+  async function handleSaveImage() {
+    if (!exportedImageUrl) return;
+    setIsSavingImage(true);
+
+    try {
+      const link = document.createElement('a');
+      link.download = `xmas-decorate-${Date.now()}.png`;
+      link.href = exportedImageUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success('Image saved successfully!');
+      setExportModalOpen(false);
+    } catch (err) {
+      console.error('Save failed:', err);
+      toast.error('Failed to save image');
+    } finally {
+      setIsSavingImage(false);
+    }
+  }
+
+  async function handleCopyImage() {
+    if (!exportedImageUrl) return;
+    setIsCopyingImage(true);
+
+    try {
+      const response = await fetch(exportedImageUrl);
+      const blob = await response.blob();
+
+      if (navigator.clipboard?.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob }),
+        ]);
+        toast.success('Image copied to clipboard!');
+      } else {
+        toast.warning('Copy not supported on this browser');
+      }
+    } catch (err) {
+      console.error('Copy failed:', err);
+      toast.error('Failed to copy image');
+    } finally {
+      setIsCopyingImage(false);
+    }
+  }
+
+  async function exportImageToDataUrl(): Promise<string | null> {
+    if (!exportNodeRef.current || isExporting) return null;
+
     setIsExporting(true);
     const node = exportNodeRef.current;
     const parentContainer = node.parentElement;
@@ -201,10 +272,10 @@ toast.success("All decorations cleared, reverted to default");
       void node.offsetHeight;
       void node.offsetWidth;
 
-      // IMPROVED: Wait for ALL images to load properly
+      // Wait for ALL images to load properly
       let allImagesLoaded = false;
       let attempts = 0;
-      const maxAttempts = 8; // Increased attempts
+      const maxAttempts = 8;
 
       while (!allImagesLoaded && attempts < maxAttempts) {
         const imgs = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
@@ -220,7 +291,7 @@ toast.success("All decorations cleared, reverted to default");
             const timeout = setTimeout(() => {
               console.warn('Image load timeout:', img.src);
               resolve();
-            }, 12000); // Increased timeout
+            }, 12000);
 
             if (img.complete && img.naturalHeight > 0 && img.naturalWidth > 0) {
               clearTimeout(timeout);
@@ -242,10 +313,24 @@ toast.success("All decorations cleared, reverted to default");
               img.addEventListener('load', onLoad, { once: true });
               img.addEventListener('error', onError, { once: true });
 
+              // CRITICAL FIX: Don't reset src for Next.js Image components
+              // This causes cache issues where items get replaced with tree images
+              // Instead, just wait for the image to load naturally
               if (!img.complete) {
-                const originalSrc = img.src;
-                img.src = '';
-                setTimeout(() => { img.src = originalSrc; }, 10);
+                // Force reload by adding cache busting parameter if needed
+                // But don't reset src completely as it breaks Next.js Image optimization
+                const url = new URL(img.src);
+                url.searchParams.set('_t', Date.now().toString());
+                // Only reload if image is really stuck
+                if (img.naturalWidth === 0 && img.naturalHeight === 0) {
+                  const originalSrc = img.src;
+                  // Use a different approach - clone the image
+                  const newImg = new Image();
+                  newImg.src = originalSrc;
+                  newImg.onload = () => {
+                    img.src = originalSrc;
+                  };
+                }
               }
             }
           });
@@ -261,7 +346,7 @@ toast.success("All decorations cleared, reverted to default");
           allImagesLoaded = true;
         } else {
           attempts++;
-          await new Promise(resolve => setTimeout(resolve, 400)); // Increased delay
+          await new Promise(resolve => setTimeout(resolve, 400));
         }
       }
 
@@ -280,22 +365,80 @@ toast.success("All decorations cleared, reverted to default");
         }
       }
 
-      // CRITICAL: Extended delay to ensure ALL decoration items are fully rendered
-      await new Promise(resolve => setTimeout(resolve, 1200)); // Increased to 1.2 seconds
+      // Extended delay to ensure ALL decoration items are fully rendered
+      await new Promise(resolve => setTimeout(resolve, 1200));
 
-      const ___ = node.offsetWidth;
-      const ____ = node.offsetHeight;
+      void node.offsetWidth;
+      void node.offsetHeight;
 
-      // Force browser to recalculate all images
-      const allImages = node.querySelectorAll('img');
-      allImages.forEach(img => {
-        const src = img.src;
-        img.src = '';
-        img.src = src;
-      });
+      // CRITICAL FIX: Verify all images have correct src and are fully loaded
+      // Don't reset src as it causes Next.js Image cache issues where items get replaced with tree
+      const allImages = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
+      const imageSrcs = new Map<string, { expected: string; current: string }>();
       
-      // Wait for recalculation
+      // Store expected srcs from data attributes to verify they don't change
+      for (const img of allImages) {
+        const itemId = img.getAttribute('data-item-id');
+        const expectedSrc = img.getAttribute('data-image-src');
+        
+        if (itemId && expectedSrc) {
+          const fullExpectedSrc = `${prefix}/${expectedSrc}`;
+          imageSrcs.set(itemId, { expected: fullExpectedSrc, current: img.src });
+          
+          // Verify image is loaded and has correct dimensions
+          if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+            console.warn('Image not fully loaded:', {
+              itemId,
+              expectedSrc: fullExpectedSrc,
+              currentSrc: img.src,
+              complete: img.complete,
+              naturalWidth: img.naturalWidth,
+              naturalHeight: img.naturalHeight
+            });
+          }
+          
+          // If src doesn't match expected, fix it immediately
+          if (!img.src.includes(expectedSrc)) {
+            console.error('Image src mismatch detected!', {
+              itemId,
+              expected: fullExpectedSrc,
+              current: img.src
+            });
+            // Force reload with correct src
+            img.src = fullExpectedSrc;
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+      }
+      
+      // Wait for final render and verify srcs haven't changed
       await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Final verification before export - restore any incorrect srcs
+      let needsReload = false;
+      for (const img of allImages) {
+        const itemId = img.getAttribute('data-item-id');
+        const expectedSrc = img.getAttribute('data-image-src');
+        
+        if (itemId && expectedSrc && imageSrcs.has(itemId)) {
+          const { expected } = imageSrcs.get(itemId)!;
+          if (!img.src.includes(expectedSrc)) {
+            console.error('Image src changed during export! Restoring...', {
+              itemId,
+              expected,
+              current: img.src
+            });
+            // Force restore correct src
+            img.src = expected;
+            needsReload = true;
+          }
+        }
+      }
+      
+      // Extra wait to ensure all images are restored if any were fixed
+      if (needsReload) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
 
       // Suppress CSS rules SecurityError
       const originalCSSRulesGetter = Object.getOwnPropertyDescriptor(CSSStyleSheet.prototype, 'cssRules')?.get;
@@ -347,10 +490,7 @@ toast.success("All decorations cleared, reverted to default");
           },
         });
 
-        // Set the new image
-        setExportedImageUrl(dataUrl);
-        setExportModalOpen(true);
-        toast.success('Image ready!');
+        return dataUrl;
       } finally {
         if (originalCSSRulesGetter) {
           Object.defineProperty(CSSStyleSheet.prototype, 'cssRules', {
@@ -417,65 +557,25 @@ toast.success("All decorations cleared, reverted to default");
         node.style.removeProperty('opacity');
       }
       node.style.removeProperty('transform');
+      return null;
     } finally {
       setIsExporting(false);
     }
   }
 
-  async function handleSaveImage() {
-    if (!exportedImageUrl) return;
-    setIsSavingImage(true);
-
-    try {
-      const link = document.createElement('a');
-      link.download = `xmas-decorate-${Date.now()}.png`;
-      link.href = exportedImageUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success('Image saved successfully!');
-      setExportModalOpen(false);
-    } catch (err) {
-      console.error('Save failed:', err);
-      toast.error('Failed to save image');
-    } finally {
-      setIsSavingImage(false);
-    }
-  }
-
-  async function handleCopyImage() {
-    if (!exportedImageUrl) return;
-    setIsCopyingImage(true);
-
-    try {
-      const response = await fetch(exportedImageUrl);
-      const blob = await response.blob();
-
-      if (navigator.clipboard?.write) {
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob }),
-        ]);
-        toast.success('Image copied to clipboard!');
-      } else {
-        toast.warning('Copy not supported on this browser');
-      }
-    } catch (err) {
-      console.error('Copy failed:', err);
-      toast.error('Failed to copy image');
-    } finally {
-      setIsCopyingImage(false);
-    }
-  }
-
   async function handleShareToX() {
-    if (!exportedImageUrl) return;
-
     try {
+      // Always export fresh image before sharing to ensure latest decoration is captured
+      const freshImageUrl = await exportImageToDataUrl();
+      
+      if (!freshImageUrl) {
+        throw new Error('Failed to export image');
+      }
+
       const quote = "I'm in for Week 1 of #RitualXmas\n\nNow it's your turn Ritualist, the holiday magic start with you\n\n@ritualnet @ritualfnd";
       
       try {
-        const response = await fetch(exportedImageUrl);
+        const response = await fetch(freshImageUrl);
         const blob = await response.blob();
         
         if (navigator.clipboard?.write) {
@@ -490,7 +590,7 @@ toast.success("All decorations cleared, reverted to default");
       const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(quote)}`;
       window.open(tweetUrl, '_blank');
       
-toast.success('X opened! Image copied to clipboard - press Ctrl+V to paste into your tweet');
+      toast.success('X opened! Image copied to clipboard - press Ctrl+V to paste into your tweet');
       setExportModalOpen(false);
     } catch (err) {
       console.error('Share failed:', err);
@@ -498,7 +598,7 @@ toast.success('X opened! Image copied to clipboard - press Ctrl+V to paste into 
       const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(quote)}`;
       window.open(tweetUrl, '_blank');
       setExportModalOpen(false);
-toast.info('X opened! Please upload the image manually');
+      toast.info('X opened! Please upload the image manually');
     }
   }
 
@@ -593,7 +693,7 @@ toast.info('X opened! Please upload the image manually');
         </div>
 
         {/* Tree and item menu */}
-        <div className="md:h-fit md:max-h-[60vh] overflow-x-scroll overflow-y-hidden md:overflow-x-hidden md:overflow-y-scroll bg-blue-500/25 rounded-[7%]">
+        <div className="md:h-fit md:max-h-[60vh] overflow-x-scroll overflow-y-hidden md:overflow-x-hidden md:overflow-y-scroll scrollbar-visible bg-blue-500/25 rounded-[7%]">
           <div ref={treeMenuRef} className="w-screen whitespace-nowrap md:w-fit md:max-h-full">
             {/* Tree menu */}
             <ul className="flex flex-row md:flex-col">
