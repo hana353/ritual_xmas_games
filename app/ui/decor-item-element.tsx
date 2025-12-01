@@ -41,22 +41,24 @@ export default function DecorItemElement({
   // State to show rotation handle on mobile when item is selected
   const [isSelected, setIsSelected] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
-  const rndContainerRef = useRef<HTMLElement | null>(null);
   
   // Deselect when clicking outside the item
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node;
-      const container = rndContainerRef.current;
       const itemDiv = itemRef.current;
       const rotationHandle = rotationHandleRef.current;
       
+      // Get Rnd container from itemRef's parent
+      const rndContainer = itemDiv?.closest('.react-draggable') as HTMLElement;
+      
       // Check if click is outside both the Rnd container and rotation handle
-      if (container && !container.contains(target) && 
+      if (rndContainer && !rndContainer.contains(target) && 
           (!rotationHandle || !rotationHandle.contains(target))) {
         setIsSelected(false);
       } else if (itemDiv && !itemDiv.contains(target) && 
-                 (!rotationHandle || !rotationHandle.contains(target))) {
+                 (!rotationHandle || !rotationHandle.contains(target)) &&
+                 (!rndContainer || !rndContainer.contains(target))) {
         setIsSelected(false);
       }
     };
@@ -325,11 +327,6 @@ export default function DecorItemElement({
       minWidth={1}
       minHeight={1}
       className={`group hover:border-2 hover:border-gray-400 active:border-2 active:border-gray-400 ${isSelected ? 'border-2 border-gray-400' : ''}`}
-      ref={(el) => {
-        if (el) {
-          rndContainerRef.current = el;
-        }
-      }}
     >
       <div 
         ref={itemRef}
