@@ -31,7 +31,12 @@ export default function DecorBox({
     <div ref={exportNodeRef} className="w-full h-full relative">
       <div
         className="absolute inset-0"
-        style={{ backgroundColor: '#0B6E4F' }}
+        style={{
+          backgroundImage: `url(${prefix}/assets/background.png)`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center center',
+          backgroundRepeat: 'no-repeat'
+        }}
       />
       
       <div className="relative w-full h-full">

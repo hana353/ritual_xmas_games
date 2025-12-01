@@ -5,8 +5,21 @@ import { prefix } from "@/app/lib/prefix";
 
 export const metadata: Metadata = {
   title: "Ritual Xmas",
+  description: "Decorate your Christmas tree with Ritual!",
   icons: {
-    icon: "/assets/X_RitualVN.jpg",
+    icon: [
+      {
+        url: "/assets/X_RitualVN.jpg",
+        type: "image/jpeg",
+      },
+    ],
+    apple: [
+      {
+        url: "/assets/X_RitualVN.jpg",
+        type: "image/jpeg",
+      },
+    ],
+    shortcut: "/assets/X_RitualVN.jpg",
   },
 };
 
@@ -19,7 +32,9 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet" />
-        <link rel="icon" href="/assets/X_RitualVN.jpg" />
+        <link rel="icon" href="/assets/X_RitualVN.jpg" type="image/jpeg" />
+        <link rel="apple-touch-icon" href="/assets/X_RitualVN.jpg" />
+        <link rel="shortcut icon" href="/assets/X_RitualVN.jpg" type="image/jpeg" />
       </head>
       <body>
         {/* Project logo (links to X) */}
