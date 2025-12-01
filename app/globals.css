@@ -28,21 +28,35 @@ body {
 }
 
 @keyframes blinkRedText {
-  0%, 100% {
-    color: #ffffff;
-    /* subtle baseline glow */
-    text-shadow: 0 0 6px rgba(255, 0, 0, 0.12);
-    box-shadow: 0 0 10px rgba(255, 0, 0, 0.06);
+  0%, 33.33% {
+    color: #3b82f6;
+    /* blue glow */
+    text-shadow: 0 0 18px rgba(59, 130, 246, 0.95),
+                 0 0 36px rgba(59, 130, 246, 0.7),
+                 0 0 60px rgba(96, 165, 250, 0.45);
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.45),
+                0 0 60px rgba(59, 130, 246, 0.32),
+                inset 0 0 20px rgba(59, 130, 246, 0.18);
   }
-  50% {
+  33.34%, 66.66% {
     color: #ff0000;
-    /* stronger red glow */
+    /* red glow */
     text-shadow: 0 0 18px rgba(255, 0, 0, 0.95),
                  0 0 36px rgba(255, 80, 80, 0.7),
                  0 0 60px rgba(255, 120, 120, 0.45);
     box-shadow: 0 0 30px rgba(255, 0, 0, 0.45),
                 0 0 60px rgba(255, 80, 80, 0.32),
                 inset 0 0 20px rgba(255, 50, 50, 0.18);
+  }
+  66.67%, 100% {
+    color: #fbbf24;
+    /* yellow glow */
+    text-shadow: 0 0 18px rgba(251, 191, 36, 0.95),
+                 0 0 36px rgba(251, 191, 36, 0.7),
+                 0 0 60px rgba(253, 224, 71, 0.45);
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.45),
+                0 0 60px rgba(251, 191, 36, 0.32),
+                inset 0 0 20px rgba(251, 191, 36, 0.18);
   }
 }
 
