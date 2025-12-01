@@ -1,32 +1,26 @@
-import { readdirSync } from "fs";
+// app/page.tsx
 import MainPage from "@/app/ui/main-page";
-import path from "path";
+
+export const dynamic = "force-static";
 
 export default function Home() {
-  // ❌ Sai: "../xmas-decorate/public"
-  // const publicPath = path.normalize("../xmas-decorate/public");
+  // --- TREES ---
+  // Bạn có 4 folder tree: 1,2,3,4
+  // Mỗi folder có 4 file: 1.1.png → 1.4.png
+  const treeLinks: string[] = Array.from({ length: 4 }, (_, folderIndex) =>
+    Array.from({ length: 4 }, (_, imgIndex) =>
+      `trees/${folderIndex + 1}/${folderIndex + 1}.${imgIndex + 1}.png`
+    )
+  ).flat();
 
-  // ✅ Đúng trên Vercel:
-  const publicPath = path.join(process.cwd(), "public");
+  // --- ITEMS (45 item) ---
+  const itemLinks: string[] = Array.from({ length: 45 }, (_, i) => `items/${i + 1}.png`);
 
-  let treeLinks: string[] = [];
-  for (let i = 1; i <= 5; i++) {
-    const treeFolder = path.join(publicPath, "trees", i.toString());
-    const treeFiles = readdirSync(treeFolder).map(
-      file => `trees/${i}/${file}`
-    );
-    treeLinks.push(...treeFiles);
-  }
+  // --- PETS (14 pet) ---
+  const petLinks: string[] = Array.from({ length: 14 }, (_, i) => `pet/${i + 1}.png`);
 
-  const itemLinks = readdirSync(path.join(publicPath, "items")).map(
-    file => `items/${file}`
-  );
-  const petLinks = readdirSync(path.join(publicPath, "pet")).map(
-    file => `pet/${file}`
-  );
-  const ribbonLinks = readdirSync(path.join(publicPath, "ribbon")).map(
-    file => `ribbon/${file}`
-  );
+  // --- RIBBON (8 ribbon) ---
+  const ribbonLinks: string[] = Array.from({ length: 8 }, (_, i) => `ribbon/${i + 1}.png`);
 
   return (
     <MainPage
@@ -37,4 +31,3 @@ export default function Home() {
     />
   );
 }
-//change this file 

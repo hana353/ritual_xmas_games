@@ -42,7 +42,6 @@ export default function MainPage({
   const [exportedImageUrl, setExportedImageUrl] = useState<string | null>(null);
   const [isSavingImage, setIsSavingImage] = useState(false);
   const [isCopyingImage, setIsCopyingImage] = useState(false);
-  const [decorationVersion, setDecorationVersion] = useState(0); // Track decoration changes
   const [guideModalOpen, setGuideModalOpen] = useState(false);
 
   // Handle saved session
@@ -56,12 +55,6 @@ export default function MainPage({
     const lastSavedItem = savedDecorItems && savedDecorItems[-1];
     if (lastSavedItem) {
       setNextId(lastSavedItem.id + 1);
-    }
-    
-    // Load exported image from localStorage if available
-    const savedExportedImage = localStorage.getItem("exportedImageUrl");
-    if (savedExportedImage) {
-      setExportedImageUrl(savedExportedImage);
     }
   }, []);
 
@@ -149,76 +142,64 @@ export default function MainPage({
     localStorage.removeItem("currentTree");
     localStorage.removeItem("currentItems");
     
-    toast.success("Đã xóa tất cả decoration, quay về mặc định");
+toast.success("All decorations cleared, reverted to default");
   }
 
   async function handleExport() {
     if (!exportNodeRef.current || isExporting) return;
 
-    // Close modal and clear previous exported image URL to ensure fresh export
-    if (exportModalOpen) {
-      setExportModalOpen(false);
-    }
+    // CRITICAL FIX: Clear previous export completely before starting new one
     setExportedImageUrl(null);
-    localStorage.removeItem("exportedImageUrl");
+    setExportModalOpen(false);
     
-    // Wait a bit for modal to close and state to update
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Wait for state to update and modal to be ready
+    await new Promise(resolve => setTimeout(resolve, 150));
     
     setIsExporting(true);
     const node = exportNodeRef.current;
     const parentContainer = node.parentElement;
 
-    // Store original computed styles to restore later (not just inline styles)
+    // Store original styles
     const originalOverflow = parentContainer ? window.getComputedStyle(parentContainer).overflow : '';
     const originalPosition = window.getComputedStyle(node).position;
     const originalVisibility = window.getComputedStyle(node).visibility;
     const originalOpacity = window.getComputedStyle(node).opacity;
     
-    // Store inline styles separately
     const originalInlineOverflow = parentContainer?.style.overflow || '';
     const originalInlinePosition = node.style.position || '';
     const originalInlineVisibility = node.style.visibility || '';
     const originalInlineOpacity = node.style.opacity || '';
     
-    // Store the class list to restore later
     const parentClasses = parentContainer?.className || '';
     
-    // Reset and ensure node is in clean state before export
+    // Reset node to clean state
     node.style.visibility = 'visible';
     node.style.opacity = '1';
     node.style.position = 'relative';
     node.style.transform = 'none';
     
-    // Force a reflow to apply styles
     void node.offsetWidth;
 
     try {
-      // Temporarily remove overflow-hidden to ensure all items are visible
       if (parentContainer) {
-        // Remove overflow-hidden class if it exists
         parentContainer.className = parentContainer.className.replace(/\boverflow-hidden\b/g, '');
-        // Also set inline style with important to override
         parentContainer.style.setProperty('overflow', 'visible', 'important');
       }
       
-      // Force multiple reflows to ensure layout is stable
       void node.offsetWidth;
       void node.offsetHeight;
       void node.offsetWidth;
 
-      // Wait for all images with improved detection
-      // Check multiple times to ensure all Next.js Image components are loaded
+      // IMPROVED: Wait for ALL images to load properly
       let allImagesLoaded = false;
       let attempts = 0;
-      const maxAttempts = 5;
+      const maxAttempts = 8; // Increased attempts
 
       while (!allImagesLoaded && attempts < maxAttempts) {
         const imgs = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
         
         if (imgs.length === 0) {
-          // No images found, wait a bit and check again
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise(resolve => setTimeout(resolve, 300));
           attempts++;
           continue;
         }
@@ -228,9 +209,8 @@ export default function MainPage({
             const timeout = setTimeout(() => {
               console.warn('Image load timeout:', img.src);
               resolve();
-            }, 10000);
+            }, 12000); // Increased timeout
 
-            // Check if image is already loaded and valid
             if (img.complete && img.naturalHeight > 0 && img.naturalWidth > 0) {
               clearTimeout(timeout);
               resolve();
@@ -251,7 +231,6 @@ export default function MainPage({
               img.addEventListener('load', onLoad, { once: true });
               img.addEventListener('error', onError, { once: true });
 
-              // Force reload if pending
               if (!img.complete) {
                 const originalSrc = img.src;
                 img.src = '';
@@ -263,7 +242,6 @@ export default function MainPage({
 
         await Promise.all(imgLoadPromises);
         
-        // Verify all images are actually loaded
         const allLoaded = imgs.every(img => 
           img.complete && img.naturalHeight > 0 && img.naturalWidth > 0
         );
@@ -272,15 +250,14 @@ export default function MainPage({
           allImagesLoaded = true;
         } else {
           attempts++;
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(resolve => setTimeout(resolve, 400)); // Increased delay
         }
       }
 
-      // Wait for all Rnd components to finish rendering
-      const rndElements = Array.from(node.querySelectorAll('[class*="react-rnd"]')) as HTMLElement[];
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait for Rnd components
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Wait for fonts with timeout
+      // Wait for fonts
       if ((document as any).fonts?.ready) {
         try {
           await Promise.race([
@@ -292,14 +269,24 @@ export default function MainPage({
         }
       }
 
-      // Extended delay to ensure all rendering is complete
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // CRITICAL: Extended delay to ensure ALL decoration items are fully rendered
+      await new Promise(resolve => setTimeout(resolve, 1200)); // Increased to 1.2 seconds
 
-      // Force another reflow before capture
       const ___ = node.offsetWidth;
       const ____ = node.offsetHeight;
 
-      // Suppress CSS rules SecurityError by temporarily overriding the getter
+      // Force browser to recalculate all images
+      const allImages = node.querySelectorAll('img');
+      allImages.forEach(img => {
+        const src = img.src;
+        img.src = '';
+        img.src = src;
+      });
+      
+      // Wait for recalculation
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Suppress CSS rules SecurityError
       const originalCSSRulesGetter = Object.getOwnPropertyDescriptor(CSSStyleSheet.prototype, 'cssRules')?.get;
       if (originalCSSRulesGetter) {
         Object.defineProperty(CSSStyleSheet.prototype, 'cssRules', {
@@ -321,17 +308,13 @@ export default function MainPage({
 
       let dataUrl: string;
       try {
-        // Generate PNG with optimized settings
-        // Filter function to skip stylesheets that cause SecurityError
         const filter = (node: Node) => {
-          // Skip script and style tags that might cause issues
           if (node.nodeName === 'SCRIPT' || node.nodeName === 'STYLE') {
             return false;
           }
           return true;
         };
 
-        // Ensure node dimensions are valid before capture
         const nodeWidth = node.clientWidth || node.offsetWidth || 800;
         const nodeHeight = node.clientHeight || node.offsetHeight || 600;
         
@@ -353,15 +336,11 @@ export default function MainPage({
           },
         });
 
-        // Show result modal with fresh image
-        // Use decorationVersion in the data URL to ensure it's unique
+        // Set the new image
         setExportedImageUrl(dataUrl);
-        // Save exported image to localStorage for persistence across page refresh
-        localStorage.setItem("exportedImageUrl", dataUrl);
         setExportModalOpen(true);
         toast.success('Image ready!');
       } finally {
-        // Restore original CSS rules getter immediately
         if (originalCSSRulesGetter) {
           Object.defineProperty(CSSStyleSheet.prototype, 'cssRules', {
             get: originalCSSRulesGetter,
@@ -369,21 +348,16 @@ export default function MainPage({
           });
         }
         
-        // Restore all original styles after a short delay to ensure image is fully generated
-        // Use requestAnimationFrame to ensure DOM updates are complete
         requestAnimationFrame(() => {
           setTimeout(() => {
             if (parentContainer) {
-              // Restore class list first
               parentContainer.className = parentClasses;
-              // Then restore inline style or remove it if it was empty
               if (originalInlineOverflow) {
                 parentContainer.style.overflow = originalInlineOverflow;
               } else {
                 parentContainer.style.removeProperty('overflow');
               }
             }
-            // Restore node styles
             if (originalInlinePosition) {
               node.style.position = originalInlinePosition;
             } else {
@@ -407,11 +381,9 @@ export default function MainPage({
       console.error('Export failed:', err);
       const errorMsg = err instanceof Error ? err.message : String(err);
       toast.error(`Capture failed: ${errorMsg}`);
-      // Restore styles even on error
+      
       if (parentContainer) {
-        // Restore class list
         parentContainer.className = parentClasses;
-        // Restore inline style
         if (originalInlineOverflow) {
           parentContainer.style.overflow = originalInlineOverflow;
         } else {
@@ -469,7 +441,6 @@ export default function MainPage({
       const response = await fetch(exportedImageUrl);
       const blob = await response.blob();
 
-      // Use Clipboard API to copy image
       if (navigator.clipboard?.write) {
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': blob }),
@@ -492,7 +463,6 @@ export default function MainPage({
     try {
       const quote = "I'm in for Week 1 of #RitualXmas\n\nNow it's your turn Ritualist, the holiday magic start with you\n\n@ritualnet @ritualfnd";
       
-      // Copy image to clipboard for easy pasting
       try {
         const response = await fetch(exportedImageUrl);
         const blob = await response.blob();
@@ -506,46 +476,25 @@ export default function MainPage({
         console.warn('Could not copy image to clipboard:', clipboardErr);
       }
       
-      // Open X/Twitter with quote pre-filled
       const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(quote)}`;
       window.open(tweetUrl, '_blank');
       
-      toast.success('Đã mở X! Hình ảnh đã được sao chép - nhấn Ctrl+V để dán vào tweet');
+toast.success('X opened! Image copied to clipboard - press Ctrl+V to paste into your tweet');
       setExportModalOpen(false);
     } catch (err) {
       console.error('Share failed:', err);
-      // Fallback: just open X with quote
       const quote = "I'm in for Week 1 of #RitualXmas\n\nNow it's your turn Ritualist, the holiday magic start with you\n\n@ritualnet @ritualfnd";
       const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(quote)}`;
       window.open(tweetUrl, '_blank');
       setExportModalOpen(false);
-      toast.info('Đã mở X! Vui lòng tải hình ảnh lên thủ công');
+toast.info('X opened! Please upload the image manually');
     }
   }
 
-  // Track decoration changes to invalidate exported image
-  useEffect(() => {
-    // Increment version when decoration actually changes (items count or tree)
-    // This will be used to ensure fresh export
-    setDecorationVersion(prev => prev + 1);
-    // Clear exported image when decoration changes (only if modal is closed)
-    // This ensures that when user changes decoration and exports again, new image is created
-    if (!exportModalOpen && exportedImageUrl) {
-      setExportedImageUrl(null);
-    }
-  }, [decorItems.length, currentTree, exportModalOpen]);
+  // REMOVED: decorationVersion tracking - không cần nữa vì mỗi lần export đều tạo mới
 
-  // Auto-export when modal opens without an image
-  // This ensures "Your Decoration" always has an image to display
-  useEffect(() => {
-    if (exportModalOpen && !exportedImageUrl && !isExporting && exportNodeRef.current) {
-      // Small delay to ensure modal is fully rendered
-      const timer = setTimeout(() => {
-        handleExport();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [exportModalOpen, exportedImageUrl, isExporting]);
+  // REMOVED: Auto-export logic - không cần auto export nữa
+  // Bây giờ chỉ export khi user bấm "Share to X"
 
   // Close tree sub-menu when clicking/tapping outside the menu
   useEffect(() => {
@@ -634,7 +583,6 @@ export default function MainPage({
 
         {/* Tree and item menu */}
         <div className="md:h-fit md:max-h-[60vh] overflow-x-scroll overflow-y-hidden md:overflow-x-hidden md:overflow-y-scroll bg-blue-500/25 rounded-[7%]">
-          {/* attach ref to detect outside clicks */}
           <div ref={treeMenuRef} className="w-screen whitespace-nowrap md:w-fit md:max-h-full">
             {/* Tree menu */}
             <ul className="flex flex-row md:flex-col">
@@ -658,7 +606,6 @@ export default function MainPage({
                         />
                       </button>
                       <ul className="relative rounded-md md:absolute bg-red-300 hidden peer-[.ring-yellow-300]:inline-block md:ml-5">
-                        {/* Tree sub-menu */}
                         {treeSubMenu.length > 0 && treeSubMenu.map(link => (
                           <li
                             key={link}
@@ -718,10 +665,10 @@ export default function MainPage({
         imageUrl={exportedImageUrl}
         onClose={() => {
           setExportModalOpen(false);
-          // Clear exported image URL and localStorage when closing modal
-          // This ensures fresh export next time
-          setExportedImageUrl(null);
-          localStorage.removeItem("exportedImageUrl");
+          // CRITICAL FIX: Clear exported image when closing to force fresh export next time
+          setTimeout(() => {
+            setExportedImageUrl(null);
+          }, 300);
         }}
         onCopy={handleCopyImage}
         onSave={handleSaveImage}
