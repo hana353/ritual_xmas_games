@@ -150,6 +150,16 @@ function addDecorItem(imgLink: string) {
     }));
   }
 
+  function handleResize(id: number, width: number, height: number) {
+    setDecorItems(decorItems.map(item => {
+      if (item.id === id) {
+        return { ...item, width, height };
+      } else {
+        return item;
+      }
+    }));
+  }
+
   function handleSave() {
     localStorage.setItem("currentTree", currentTree);
     localStorage.setItem("currentItems", JSON.stringify(decorItems));
@@ -760,8 +770,8 @@ toast.success("All decorations cleared, reverted to default");
           onResizeStop={handleResizeStop}
           onDoubleClick={deleteDecorItem}
           onTouchStart={deleteItemOnDoubleTouch}
-            onRotate={handleRotate} // Thêm prop
-
+          onRotate={handleRotate}
+          onResize={handleResize}
         />
       </div>
 

@@ -11,18 +11,32 @@ export default function DecorItemElement({
   onResizeStop,
   onDoubleClick,
   onTouchStart,
-  onRotate
+  onRotate,
+  onResize
 }: {
   item: DraggableItem,
   onDragStop: DraggableEventHandler,
   onResizeStop: RndResizeCallback,
   onDoubleClick: MouseEventHandler<HTMLImageElement>,
   onTouchStart: TouchEventHandler<HTMLImageElement>,
-  onRotate: (id: number, delta: number) => void
+  onRotate: (id: number, delta: number) => void,
+  onResize?: (id: number, width: number, height: number) => void
 }) {
   const rotationHandleRef = useRef<HTMLDivElement>(null);
   const [isRotating, setIsRotating] = useState(false);
   const rotationStartRef = useRef<{ centerX: number; centerY: number; initialRotation: number; initialAngle: number } | null>(null);
+  
+  // Multi-touch gesture state
+  const [isMultiTouch, setIsMultiTouch] = useState(false);
+  const multiTouchStartRef = useRef<{
+    distance: number;
+    angle: number;
+    initialWidth: number;
+    initialHeight: number;
+    initialRotation: number;
+    centerX: number;
+    centerY: number;
+  } | null>(null);
 
   const handleResize = (
     e: MouseEvent | TouchEvent,
@@ -101,6 +115,122 @@ export default function DecorItemElement({
     rotationStartRef.current = null;
   };
 
+  // Helper function to calculate distance between two touches
+  const getTouchDistance = (touch1: Touch, touch2: Touch): number => {
+    const dx = touch2.clientX - touch1.clientX;
+    const dy = touch2.clientY - touch1.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // Helper function to calculate angle between two touches
+  const getTouchAngle = (touch1: Touch, touch2: Touch): number => {
+    const dx = touch2.clientX - touch1.clientX;
+    const dy = touch2.clientY - touch1.clientY;
+    return Math.atan2(dy, dx) * (180 / Math.PI);
+  };
+
+  // Helper function to calculate center point between two touches
+  const getTouchCenter = (touch1: Touch, touch2: Touch): { x: number; y: number } => {
+    return {
+      x: (touch1.clientX + touch2.clientX) / 2,
+      y: (touch1.clientY + touch2.clientY) / 2
+    };
+  };
+
+  // Handle multi-touch start (2 fingers)
+  const handleMultiTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 2) return;
+
+    setIsMultiTouch(true);
+    const touch1 = e.touches[0];
+    const touch2 = e.touches[1];
+
+    const distance = getTouchDistance(touch1, touch2);
+    const angle = getTouchAngle(touch1, touch2);
+    const center = getTouchCenter(touch1, touch2);
+
+    // Get Rnd container
+    const rndElement = e.currentTarget.closest('.react-draggable') as HTMLElement;
+    if (!rndElement) return;
+
+    const rect = rndElement.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    multiTouchStartRef.current = {
+      distance,
+      angle,
+      initialWidth: item.width,
+      initialHeight: item.height,
+      initialRotation: item.rotation,
+      centerX,
+      centerY
+    };
+  };
+
+  // Handle multi-touch move (2 fingers)
+  const handleMultiTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length !== 2 || !multiTouchStartRef.current) return;
+
+    const touch1 = e.touches[0];
+    const touch2 = e.touches[1];
+
+    const currentDistance = getTouchDistance(touch1, touch2);
+    const currentAngle = getTouchAngle(touch1, touch2);
+
+    const start = multiTouchStartRef.current;
+
+    // Calculate scale factor for resize
+    const scale = currentDistance / start.distance;
+    const newWidth = Math.max(50, Math.min(800, start.initialWidth * scale));
+    const newHeight = Math.max(50, Math.min(800, start.initialHeight * scale));
+
+    // Calculate rotation delta
+    let angleDelta = currentAngle - start.angle;
+    // Normalize angle delta
+    while (angleDelta > 180) angleDelta -= 360;
+    while (angleDelta < -180) angleDelta += 360;
+
+    const newRotation = start.initialRotation + angleDelta;
+    const normalizedRotation = ((newRotation % 360) + 360) % 360;
+
+    // Update size if changed significantly
+    if (Math.abs(newWidth - item.width) > 1 || Math.abs(newHeight - item.height) > 1) {
+      if (onResize) {
+        onResize(item.id, newWidth, newHeight);
+      } else {
+        // Fallback: use onResizeStop
+        const rndElement = e.currentTarget.closest('.react-draggable') as HTMLElement;
+        if (rndElement) {
+          const mockEvent = new MouseEvent('mousemove') as any;
+          onResizeStop(
+            mockEvent,
+            'bottomRight',
+            rndElement,
+            { width: newWidth - item.width, height: newHeight - item.height },
+            { x: item.x, y: item.y }
+          );
+        }
+      }
+    }
+
+    // Update rotation
+    const currentRotation = item.rotation;
+    let rotationDelta = normalizedRotation - currentRotation;
+    if (rotationDelta > 180) rotationDelta -= 360;
+    if (rotationDelta < -180) rotationDelta += 360;
+
+    if (Math.abs(rotationDelta) > 0.1) {
+      onRotate(item.id, rotationDelta);
+    }
+  };
+
+  // Handle multi-touch end
+  const handleMultiTouchEnd = () => {
+    setIsMultiTouch(false);
+    multiTouchStartRef.current = null;
+  };
+
   // Thêm event listeners cho mouse và touch
   useEffect(() => {
     if (isRotating) {
@@ -177,7 +307,31 @@ export default function DecorItemElement({
           loading="eager"
           draggable={false}
           onDoubleClick={onDoubleClick}
-          onTouchStart={onTouchStart}
+          onTouchStart={(e) => {
+            // Check for multi-touch (2 fingers)
+            if (e.touches.length === 2) {
+              e.preventDefault();
+              e.stopPropagation();
+              handleMultiTouchStart(e);
+            } else {
+              // Single touch - allow normal behavior (drag, double tap)
+              onTouchStart(e);
+            }
+          }}
+          onTouchMove={(e) => {
+            if (e.touches.length === 2 && isMultiTouch) {
+              e.preventDefault();
+              e.stopPropagation();
+              handleMultiTouchMove(e);
+            }
+          }}
+          onTouchEnd={(e) => {
+            if (isMultiTouch) {
+              e.preventDefault();
+              e.stopPropagation();
+              handleMultiTouchEnd();
+            }
+          }}
           data-item-id={item.id}
           data-image-src={item.imageSrc}
         />

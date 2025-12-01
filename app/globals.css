@@ -65,6 +65,27 @@ body {
   font-family: var(--font-christmas);
 }
 
+/* Mobile adjustments for Merry Christmas text */
+@media (max-width: 768px) {
+  .blink-red-yellow {
+    font-size: 1.8rem;
+    padding: 8px 15px;
+    letter-spacing: 1px;
+    top: 50px;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .blink-red-yellow {
+    font-size: 1.4rem;
+    padding: 6px 12px;
+    letter-spacing: 0.5px;
+    top: 45px;
+    border-radius: 10px;
+  }
+}
+
 /* Logo effect: gentle pulse + hover scale + glow */
 @keyframes logoPulse {
   0%, 100% {

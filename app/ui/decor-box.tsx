@@ -14,7 +14,8 @@ export default function DecorBox({
   onResizeStop,
   onDoubleClick,
   onTouchStart,
-  onRotate // Thêm prop mới
+  onRotate,
+  onResize
 }: {
   tree: string,
   decorItems: DraggableItem[],
@@ -23,7 +24,8 @@ export default function DecorBox({
   onResizeStop: RndResizeCallback,
   onDoubleClick: MouseEventHandler<HTMLImageElement>,
   onTouchStart: TouchEventHandler<HTMLImageElement>,
-  onRotate: (id: number, delta: number) => void // Thêm type
+  onRotate: (id: number, delta: number) => void,
+  onResize?: (id: number, width: number, height: number) => void
 }) {
   return (
     <div ref={exportNodeRef} className="w-full h-full relative">
@@ -53,7 +55,8 @@ export default function DecorBox({
           onResizeStop={onResizeStop}
           onDoubleClick={onDoubleClick}
           onTouchStart={onTouchStart}
-          onRotate={onRotate} // Truyền prop
+          onRotate={onRotate}
+          onResize={onResize}
         />
       ))}
     </div>
