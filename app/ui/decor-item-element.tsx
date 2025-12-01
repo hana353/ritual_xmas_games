@@ -37,6 +37,44 @@ export default function DecorItemElement({
     centerX: number;
     centerY: number;
   } | null>(null);
+  
+  // State to show rotation handle on mobile when item is selected
+  const [isSelected, setIsSelected] = useState(false);
+  const itemRef = useRef<HTMLDivElement>(null);
+  const rndContainerRef = useRef<HTMLElement | null>(null);
+  
+  // Deselect when clicking outside the item
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      const container = rndContainerRef.current;
+      const itemDiv = itemRef.current;
+      const rotationHandle = rotationHandleRef.current;
+      
+      // Check if click is outside both the Rnd container and rotation handle
+      if (container && !container.contains(target) && 
+          (!rotationHandle || !rotationHandle.contains(target))) {
+        setIsSelected(false);
+      } else if (itemDiv && !itemDiv.contains(target) && 
+                 (!rotationHandle || !rotationHandle.contains(target))) {
+        setIsSelected(false);
+      }
+    };
+    
+    if (isSelected) {
+      // Use setTimeout to avoid immediate deselection when touch starts
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+      }, 150);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('touchstart', handleClickOutside);
+      };
+    }
+  }, [isSelected]);
 
   const handleResize = (
     e: MouseEvent | TouchEvent,
@@ -286,9 +324,15 @@ export default function DecorItemElement({
       onResizeStop={onResizeStop}
       minWidth={1}
       minHeight={1}
-      className="group hover:border-2 hover:border-gray-400 active:border-2 active:border-gray-400"
+      className={`group hover:border-2 hover:border-gray-400 active:border-2 active:border-gray-400 ${isSelected ? 'border-2 border-gray-400' : ''}`}
+      ref={(el) => {
+        if (el) {
+          rndContainerRef.current = el;
+        }
+      }}
     >
       <div 
+        ref={itemRef}
         className="relative w-full h-full"
         style={{
           transform: `rotate(${item.rotation}deg)`,
@@ -313,8 +357,11 @@ export default function DecorItemElement({
               e.preventDefault();
               e.stopPropagation();
               handleMultiTouchStart(e);
+              setIsSelected(false); // Hide rotation handle during multi-touch
             } else {
-              // Single touch - allow normal behavior (drag, double tap)
+              // Single touch - show rotation handle on mobile
+              setIsSelected(true);
+              // Allow normal behavior (drag, double tap)
               onTouchStart(e);
             }
           }}
@@ -337,10 +384,12 @@ export default function DecorItemElement({
         />
       </div>
       
-      {/* Nút xoay ở góc dưới bên phải - chỉ hiện khi hover */}
+      {/* Nút xoay ở góc dưới bên phải - hiện khi hover (desktop) hoặc selected (mobile) */}
       <div
         ref={rotationHandleRef}
-        className="absolute w-6 h-6 rounded-full bg-white border-2 border-blue-500 cursor-grab active:cursor-grabbing shadow-lg hover:bg-blue-50 transition-all z-10 flex items-center justify-center opacity-0 group-hover:opacity-100"
+        className={`absolute w-6 h-6 rounded-full bg-white border-2 border-blue-500 cursor-grab active:cursor-grabbing shadow-lg hover:bg-blue-50 transition-all z-10 flex items-center justify-center ${
+          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}
         onMouseDown={handleRotationStart}
         onTouchStart={handleRotationStart}
         style={{
