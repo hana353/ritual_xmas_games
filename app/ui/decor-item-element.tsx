@@ -116,21 +116,21 @@ export default function DecorItemElement({
   };
 
   // Helper function to calculate distance between two touches
-  const getTouchDistance = (touch1: Touch, touch2: Touch): number => {
+  const getTouchDistance = (touch1: React.Touch, touch2: React.Touch): number => {
     const dx = touch2.clientX - touch1.clientX;
     const dy = touch2.clientY - touch1.clientY;
     return Math.sqrt(dx * dx + dy * dy);
   };
 
   // Helper function to calculate angle between two touches
-  const getTouchAngle = (touch1: Touch, touch2: Touch): number => {
+  const getTouchAngle = (touch1: React.Touch, touch2: React.Touch): number => {
     const dx = touch2.clientX - touch1.clientX;
     const dy = touch2.clientY - touch1.clientY;
     return Math.atan2(dy, dx) * (180 / Math.PI);
   };
 
   // Helper function to calculate center point between two touches
-  const getTouchCenter = (touch1: Touch, touch2: Touch): { x: number; y: number } => {
+  const getTouchCenter = (touch1: React.Touch, touch2: React.Touch): { x: number; y: number } => {
     return {
       x: (touch1.clientX + touch2.clientX) / 2,
       y: (touch1.clientY + touch2.clientY) / 2
