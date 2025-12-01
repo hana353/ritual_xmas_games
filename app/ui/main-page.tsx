@@ -188,6 +188,33 @@ toast.success("All decorations cleared, reverted to default");
     // Wait for state to update and modal to be ready
     await new Promise(resolve => setTimeout(resolve, 150));
     
+    // Force clear Next.js Image cache by reloading all images
+    if (exportNodeRef.current) {
+      const allImages = Array.from(exportNodeRef.current.querySelectorAll('img')) as HTMLImageElement[];
+      for (const img of allImages) {
+        const itemId = img.getAttribute('data-item-id');
+        const expectedSrc = img.getAttribute('data-image-src');
+        
+        // Only reload decoration items, not tree background
+        if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '') {
+          const fullExpectedSrc = `${prefix}/${expectedSrc}`;
+          // Add cache busting parameter to force reload
+          const cacheBuster = `?cb=${Date.now()}`;
+          // Temporarily change src to force reload
+          const currentSrc = img.src;
+          if (currentSrc !== fullExpectedSrc + cacheBuster) {
+            img.src = fullExpectedSrc + cacheBuster;
+            // Wait a bit then restore to normal src (without cache buster for export)
+            setTimeout(() => {
+              img.src = fullExpectedSrc;
+            }, 50);
+          }
+        }
+      }
+      // Wait for images to start reloading
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
     const dataUrl = await exportImageToDataUrl();
     
     if (dataUrl) {
@@ -282,17 +309,17 @@ toast.success("All decorations cleared, reverted to default");
       void node.offsetHeight;
       void node.offsetWidth;
 
-      // Wait for ALL images to load properly - increased attempts for mobile
+      // Wait for ALL images to load properly - optimized for mobile speed
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       let allImagesLoaded = false;
       let attempts = 0;
-      const maxAttempts = 15; // Increased for mobile
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const maxAttempts = isMobile ? 8 : 6; // Reduced for faster export
 
       while (!allImagesLoaded && attempts < maxAttempts) {
         const imgs = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
         
         if (imgs.length === 0) {
-          await new Promise(resolve => setTimeout(resolve, isMobile ? 500 : 300));
+          await new Promise(resolve => setTimeout(resolve, isMobile ? 200 : 150));
           attempts++;
           continue;
         }
@@ -302,7 +329,7 @@ toast.success("All decorations cleared, reverted to default");
             const timeout = setTimeout(() => {
               console.warn('Image load timeout:', img.src);
               resolve();
-            }, isMobile ? 15000 : 12000); // Longer timeout for mobile
+            }, isMobile ? 6000 : 5000); // Reduced timeout for faster export
 
             if (img.complete && img.naturalHeight > 0 && img.naturalWidth > 0) {
               clearTimeout(timeout);
@@ -324,22 +351,10 @@ toast.success("All decorations cleared, reverted to default");
               img.addEventListener('load', onLoad, { once: true });
               img.addEventListener('error', onError, { once: true });
 
-              // On mobile, ensure image is actually loading
+              // On mobile, ensure image is actually loading (optimized)
               if (!img.complete && isMobile) {
-                // Force a small delay to let browser start loading
-                setTimeout(() => {
-                  if (!img.complete && img.naturalWidth === 0 && img.naturalHeight === 0) {
-                    // Image might be stuck, try to trigger load
-                    const originalSrc = img.src;
-                    const imgElement = img as HTMLImageElement;
-                    // Create new image to preload
-                    const preloadImg = new Image();
-                    preloadImg.onload = () => {
-                      // Image is ready, but don't change src to avoid cache issues
-                    };
-                    preloadImg.src = originalSrc;
-                  }
-                }, 100);
+                // Skip preload check to speed up - images should already be in cache
+                // Just wait for natural load
               }
             }
           });
@@ -365,28 +380,28 @@ toast.success("All decorations cleared, reverted to default");
           allImagesLoaded = true;
         } else {
           attempts++;
-          // Longer delay on mobile
-          await new Promise(resolve => setTimeout(resolve, isMobile ? 600 : 400));
+          // Reduced delay for faster export
+          await new Promise(resolve => setTimeout(resolve, isMobile ? 250 : 200));
         }
       }
 
-      // Wait for Rnd components - longer on mobile
-      await new Promise(resolve => setTimeout(resolve, isMobile ? 800 : 500));
+      // Wait for Rnd components - optimized for speed
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 300 : 200));
 
-      // Wait for fonts
+      // Wait for fonts - optimized timeout
       if ((document as any).fonts?.ready) {
         try {
           await Promise.race([
             (document as any).fonts.ready,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Font timeout')), isMobile ? 5000 : 3000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Font timeout')), isMobile ? 2000 : 1500))
           ]);
         } catch (err) {
           console.warn('Font loading timeout or failed', err);
         }
       }
 
-      // Extended delay to ensure ALL decoration items are fully rendered - much longer on mobile
-      await new Promise(resolve => setTimeout(resolve, isMobile ? 2000 : 1200));
+      // Reduced delay to ensure ALL decoration items are fully rendered - optimized for speed
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 600 : 400));
 
       void node.offsetWidth;
       void node.offsetHeight;
@@ -396,74 +411,185 @@ toast.success("All decorations cleared, reverted to default");
       const allImages = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
       const imageSrcs = new Map<string, { expected: string; current: string }>();
       
-      // Store expected srcs from data attributes to verify they don't change
-      for (const img of allImages) {
-        const itemId = img.getAttribute('data-item-id');
-        const expectedSrc = img.getAttribute('data-image-src');
-        
-        if (itemId && expectedSrc) {
-          const fullExpectedSrc = `${prefix}/${expectedSrc}`;
-          imageSrcs.set(itemId, { expected: fullExpectedSrc, current: img.src });
-          
-          // Verify image is loaded and has correct dimensions
-          if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
-            console.warn('Image not fully loaded:', {
-              itemId,
-              expectedSrc: fullExpectedSrc,
-              currentSrc: img.src,
-              complete: img.complete,
-              naturalWidth: img.naturalWidth,
-              naturalHeight: img.naturalHeight
-            });
-          }
-          
-          // If src doesn't match expected, fix it immediately
-          if (!img.src.includes(expectedSrc)) {
-            console.error('Image src mismatch detected!', {
-              itemId,
-              expected: fullExpectedSrc,
-              current: img.src
-            });
-            // Force reload with correct src
-            img.src = fullExpectedSrc;
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        }
-      }
+       // Store expected srcs from data attributes to verify they don't change
+       // Only check images with data attributes (decoration items), skip tree background
+       for (const img of allImages) {
+         const itemId = img.getAttribute('data-item-id');
+         const expectedSrc = img.getAttribute('data-image-src');
+         
+         // Only process decoration items with valid data attributes
+         if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '') {
+           const fullExpectedSrc = `${prefix}/${expectedSrc}`;
+           imageSrcs.set(itemId, { expected: fullExpectedSrc, current: img.src });
+           
+           // Verify image is loaded and has correct dimensions
+           if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+             console.warn('Image not fully loaded:', {
+               itemId,
+               expectedSrc: fullExpectedSrc,
+               currentSrc: img.src,
+               complete: img.complete,
+               naturalWidth: img.naturalWidth,
+               naturalHeight: img.naturalHeight
+             });
+           }
+           
+           // Check if src matches expected (handle both full URL and relative path)
+           const currentSrc = img.src || '';
+           const srcMatches = currentSrc.includes(expectedSrc) || 
+                             currentSrc.includes(encodeURIComponent(expectedSrc)) ||
+                             currentSrc.endsWith(expectedSrc) ||
+                             currentSrc === fullExpectedSrc;
+           
+           // Only log and fix if there's a real mismatch
+           if (!srcMatches && currentSrc !== '') {
+             console.warn('Image src mismatch detected, fixing...', {
+               itemId: itemId || 'unknown',
+               expected: fullExpectedSrc,
+               current: currentSrc,
+               expectedSrc: expectedSrc
+             });
+             // Force reload with correct src and wait for it to load
+             // Add cache busting to prevent Next.js Image cache issues
+             const cacheBuster = `?cb=${Date.now()}-${itemId}`;
+             const srcWithCacheBuster = fullExpectedSrc + cacheBuster;
+             
+             // First, set src with cache buster to force reload
+             img.src = srcWithCacheBuster;
+             
+             // Wait for image to actually load after src change
+             await new Promise<void>((resolve) => {
+               if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+                 // Image loaded, now set to final src without cache buster
+                 img.src = fullExpectedSrc;
+                 resolve();
+               } else {
+                 const onLoad = () => {
+                   img.removeEventListener('load', onLoad);
+                   img.removeEventListener('error', onError);
+                   // Image loaded, now set to final src without cache buster
+                   img.src = fullExpectedSrc;
+                   resolve();
+                 };
+                 const onError = () => {
+                   console.warn('Failed to reload image:', fullExpectedSrc);
+                   img.removeEventListener('load', onLoad);
+                   img.removeEventListener('error', onError);
+                   // Try setting to final src anyway
+                   img.src = fullExpectedSrc;
+                   resolve();
+                 };
+                 img.addEventListener('load', onLoad, { once: true });
+                 img.addEventListener('error', onError, { once: true });
+                 
+                 // Timeout after 3 seconds
+                 setTimeout(() => {
+                   img.removeEventListener('load', onLoad);
+                   img.removeEventListener('error', onError);
+                   // Set to final src on timeout
+                   img.src = fullExpectedSrc;
+                   resolve();
+                 }, 3000);
+               }
+             });
+             
+             // Additional wait to ensure image is fully rendered with correct src
+             await new Promise(resolve => setTimeout(resolve, isMobile ? 400 : 300));
+           }
+         }
+         // Skip images without data attributes (like tree background) - they're fine
+       }
       
-      // Wait for final render and verify srcs haven't changed - longer on mobile
-      await new Promise(resolve => setTimeout(resolve, isMobile ? 500 : 300));
+      // Wait for final render and verify srcs haven't changed - increased for reliability
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 400 : 300));
       
-      // Final verification before export - restore any incorrect srcs
+      // Final verification before export - restore any incorrect srcs with proper loading
       let needsReload = false;
       let reloadCount = 0;
-      const maxReloadAttempts = isMobile ? 5 : 3;
+      const maxReloadAttempts = isMobile ? 3 : 3; // Increased attempts for reliability
       
       while (reloadCount < maxReloadAttempts) {
         needsReload = false;
+        const reloadPromises: Promise<void>[] = [];
+        
         for (const img of allImages) {
           const itemId = img.getAttribute('data-item-id');
           const expectedSrc = img.getAttribute('data-image-src');
           
-          if (itemId && expectedSrc && imageSrcs.has(itemId)) {
+          // Only process images with valid data attributes
+          if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '' && imageSrcs.has(itemId)) {
             const { expected } = imageSrcs.get(itemId)!;
             // Check if image is loaded AND src is correct
             const isLoaded = img.complete && img.naturalHeight > 0 && img.naturalWidth > 0;
-            const srcCorrect = img.src.includes(expectedSrc);
+            const currentSrc = img.src || '';
+            const srcCorrect = currentSrc.includes(expectedSrc) || 
+                              currentSrc.includes(encodeURIComponent(expectedSrc)) ||
+                              currentSrc.endsWith(expectedSrc) ||
+                              currentSrc === expected;
             
             if (!isLoaded || !srcCorrect) {
-              if (!srcCorrect) {
-                console.error('Image src changed during export! Restoring...', {
-                  itemId,
-                  expected,
-                  current: img.src
+              if (!srcCorrect && currentSrc !== '') {
+                console.warn('Image src changed during export! Restoring...', {
+                  itemId: itemId || 'unknown',
+                  expected: expected || 'unknown',
+                  current: currentSrc || 'empty',
+                  expectedSrc: expectedSrc || 'unknown'
                 });
-                // Force restore correct src
-                img.src = expected;
+                // Force restore correct src and wait for it to load
+                // Add cache busting to prevent Next.js Image cache issues
+                const cacheBuster = `?cb=${Date.now()}-${itemId}`;
+                const expectedWithCacheBuster = expected + cacheBuster;
+                
+                const reloadPromise = new Promise<void>((resolve) => {
+                  // First, set src with cache buster to force reload
+                  img.src = expectedWithCacheBuster;
+                  
+                  // Wait for image to actually load after src change
+                  if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+                    // Image loaded, now set to final src without cache buster
+                    img.src = expected;
+                    resolve();
+                  } else {
+                    const onLoad = () => {
+                      img.removeEventListener('load', onLoad);
+                      img.removeEventListener('error', onError);
+                      // Image loaded, now set to final src without cache buster
+                      img.src = expected;
+                      resolve();
+                    };
+                    const onError = () => {
+                      console.warn('Failed to reload image during final verification:', expected);
+                      img.removeEventListener('load', onLoad);
+                      img.removeEventListener('error', onError);
+                      // Try setting to final src anyway
+                      img.src = expected;
+                      resolve();
+                    };
+                    img.addEventListener('load', onLoad, { once: true });
+                    img.addEventListener('error', onError, { once: true });
+                    
+                    // Timeout after 3 seconds
+                    setTimeout(() => {
+                      img.removeEventListener('load', onLoad);
+                      img.removeEventListener('error', onError);
+                      // Set to final src on timeout
+                      img.src = expected;
+                      resolve();
+                    }, 3000);
+                  }
+                });
+                reloadPromises.push(reloadPromise);
               }
               needsReload = true;
             }
           }
+        }
+        
+        // Wait for all reloads to complete
+        if (reloadPromises.length > 0) {
+          await Promise.all(reloadPromises);
+          // Additional wait to ensure images are fully rendered
+          await new Promise(resolve => setTimeout(resolve, isMobile ? 400 : 300));
         }
         
         if (!needsReload) {
@@ -471,8 +597,8 @@ toast.success("All decorations cleared, reverted to default");
         }
         
         reloadCount++;
-        // Wait longer on mobile for images to reload
-        await new Promise(resolve => setTimeout(resolve, isMobile ? 500 : 300));
+        // Wait before re-checking
+        await new Promise(resolve => setTimeout(resolve, isMobile ? 300 : 200));
         
         // Re-check all images
         const currentImages = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
@@ -480,8 +606,42 @@ toast.success("All decorations cleared, reverted to default");
         allImages.push(...currentImages);
       }
       
-      // Final wait after all fixes - critical for mobile
-      await new Promise(resolve => setTimeout(resolve, isMobile ? 800 : 400));
+      // Final wait after all fixes - increased for reliability
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 500 : 400));
+      
+      // One more verification pass to ensure all images are correct
+      const finalImages = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
+      for (const img of finalImages) {
+        const itemId = img.getAttribute('data-item-id');
+        const expectedSrc = img.getAttribute('data-image-src');
+        
+        if (itemId && expectedSrc && itemId.trim() !== '' && expectedSrc.trim() !== '' && imageSrcs.has(itemId)) {
+          const { expected } = imageSrcs.get(itemId)!;
+          const currentSrc = img.src || '';
+          const srcCorrect = currentSrc.includes(expectedSrc) || 
+                            currentSrc.includes(encodeURIComponent(expectedSrc)) ||
+                            currentSrc.endsWith(expectedSrc) ||
+                            currentSrc === expected;
+          
+          if (!srcCorrect && currentSrc !== '') {
+            console.warn('Final check: Image src still incorrect, forcing restore:', {
+              itemId,
+              expected,
+              current: currentSrc
+            });
+            // Use cache busting to force reload
+            const cacheBuster = `?cb=${Date.now()}-${itemId}`;
+            img.src = expected + cacheBuster;
+            // Wait a bit then set to final src
+            setTimeout(() => {
+              img.src = expected;
+            }, 100);
+          }
+        }
+      }
+      
+      // Final wait after last verification
+      await new Promise(resolve => setTimeout(resolve, isMobile ? 400 : 300));
 
       // Suppress CSS rules SecurityError
       const originalCSSRulesGetter = Object.getOwnPropertyDescriptor(CSSStyleSheet.prototype, 'cssRules')?.get;
