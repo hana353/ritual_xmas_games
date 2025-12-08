@@ -1074,7 +1074,7 @@ toast.success("All decorations cleared, reverted to default");
         throw new Error('Failed to export image');
       }
 
-      const quote = "I'm in for Week 1 of #RitualXmas\n\nNow it's your turn Ritualist, the holiday magic start with you\n\n Step into the magic at http://ritualxmas.xyz and join our Christmas Decoration Event! ✨\n\n@ritualnet @ritualfnd";
+      const quote = "I'm in for Week 2 of #RitualXmas.\n\nNow it's your turn, Ritualist the holiday magic starts with you.\n\nStep into the magic at ritualxmas.xyz and join our Christmas Decoration Event!\n\nWishing you a peaceful Christmas filled with warmth, light, and a little holiday magic.\n\nMerry Christmas! 🎄\n\n@ritualnet @ritualfnd";
       
       // Detect mobile device
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -1166,7 +1166,7 @@ toast.success("All decorations cleared, reverted to default");
       }
     } catch (err) {
       console.error('Share failed:', err);
-      const quote = "I'm in for Week 1 of #RitualXmas\n\nNow it's your turn Ritualist, the holiday magic start with you\n\n Step into the magic at http://ritualxmas.xyz and join our Christmas Decoration Event! ✨\n\n@ritualnet @ritualfnd";
+      const quote = "I'm in for Week 2 of #RitualXmas.\n\nNow it's your turn, Ritualist the holiday magic starts with you.\n\nStep into the magic at ritualxmas.xyz and join our Christmas Decoration Event!\n\nWishing you a peaceful Christmas filled with warmth, light, and a little holiday magic.\n\nMerry Christmas! 🎄\n\n@ritualnet @ritualfnd";
       const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(quote)}`;
       window.open(tweetUrl, '_blank');
       setExportModalOpen(false);
