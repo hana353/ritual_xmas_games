@@ -1447,6 +1447,8 @@ toast.success("All decorations cleared, reverted to default");
                     .map((link, idx) => {
                       const isTreeSelected = currentTrees.some(t => t.imageSrc === link);
                       const isExpanded = selectedTreeForVariants === link;
+                      // Calculate variants for this tree
+                      const treeSubMenuItems = treeLinks.filter(l => l.startsWith(`trees/${idx + 1}`) && (l.split('/').pop() || l) !== `${idx + 1}.1.png`);
                       
                       return (
                         <button
@@ -1455,8 +1457,9 @@ toast.success("All decorations cleared, reverted to default");
                           onClick={() => {
                             addTree(link);
                             // Toggle: nếu đã expanded thì collapse, nếu chưa thì expand
-                            setSelectedTreeForVariants(isExpanded ? null : link);
-                            const treeSubMenuItems = treeLinks.filter(l => l.startsWith(`trees/${idx + 1}`) && (l.split('/').pop() || l) !== `${idx + 1}.1.png`);
+                            const newExpandedState = isExpanded ? null : link;
+                            setSelectedTreeForVariants(newExpandedState);
+                            // Always update treeSubMenu when clicking a tree
                             setTreeSubMenu(treeSubMenuItems);
                           }}
                         >
@@ -1471,28 +1474,47 @@ toast.success("All decorations cleared, reverted to default");
                   }
                 </div>
                 {/* Variants of selected tree - only show when a tree is expanded */}
-                {selectedTreeForVariants && treeSubMenu.length > 0 && (
-                  <div className="border-t-2 border-yellow-500/50 pt-2 mt-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-yellow-400 font-bold text-xs bg-green-900/50 px-2 py-1 rounded">Variants:</span>
+                {selectedTreeForVariants && (() => {
+                  // Find the selected tree index to get its variants
+                  const selectedTreeIdx = treeLinks
+                    .filter(link => link.endsWith(".1.png"))
+                    .findIndex(link => link === selectedTreeForVariants);
+                  
+                  if (selectedTreeIdx === -1) return null;
+                  
+                  const variants = treeLinks.filter(l => 
+                    l.startsWith(`trees/${selectedTreeIdx + 1}`) && 
+                    (l.split('/').pop() || l) !== `${selectedTreeIdx + 1}.1.png`
+                  );
+                  
+                  if (variants.length === 0) return null;
+                  
+                  return (
+                    <div className="border-t-2 border-yellow-500/50 pt-2 mt-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-yellow-400 font-bold text-xs bg-green-900/50 px-2 py-1 rounded">Variants:</span>
+                      </div>
+                      <div className="flex flex-row gap-2 overflow-x-auto pb-1">
+                        {variants.map(subLink => (
+                          <button
+                            key={subLink}
+                            className="christmas-item w-16 h-16 flex-shrink-0 inline-flex items-center justify-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addDecorItem(subLink);
+                            }}
+                          >
+                            <img
+                              src={`${prefix}/${subLink}`}
+                              alt="Tree variant"
+                              className="w-full h-full object-contain drop-shadow-lg p-1"
+                            />
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex flex-row gap-2 overflow-x-auto pb-1">
-                      {treeSubMenu.map(subLink => (
-                        <button
-                          key={subLink}
-                          className="christmas-item w-16 h-16 flex-shrink-0 inline-flex items-center justify-center"
-                          onClick={() => addDecorItem(subLink)}
-                        >
-                          <img
-                            src={`${prefix}/${subLink}`}
-                            alt="Tree variant"
-                            className="w-full h-full object-contain drop-shadow-lg p-1"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
               </>
             )}
             {/* Other items for mobile - horizontal scroll layout */}
