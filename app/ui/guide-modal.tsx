@@ -29,49 +29,69 @@ export default function GuideModal({
         {/* Content */}
         <div className="p-6 space-y-4">
           <div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">🎄 Decorate Your Christmas Tree</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">🎄 Decorate Your Christmas</h3>
             <p className="text-gray-600">
-              Create your own unique Christmas tree decoration!
+              Create your own unique Christmas photo decoration! Select a menu option to see available items.
             </p>
           </div>
 
           <div className="space-y-3">
             <div>
-              <h4 className="font-bold text-gray-800 mb-1">1. Choose a Tree</h4>
+              <h4 className="font-bold text-gray-800 mb-1">1. Select a Menu</h4>
               <p className="text-gray-600 text-sm">
-                Select one of the available trees from the "Trees" menu below.
+                Click on any menu option (Background, Trees, Pets, Ribbons, Items, or Siggy) to see available items. 
+                The item list will appear after selecting a menu option.
               </p>
             </div>
 
             <div>
-              <h4 className="font-bold text-gray-800 mb-1">2. Add Decorations</h4>
+              <h4 className="font-bold text-gray-800 mb-1">2. Choose Background</h4>
               <p className="text-gray-600 text-sm">
-                Use the "Items", "Pets", or "Ribbons" menu to add decorations to your tree.
+                Select a background from the "Background" menu. Only one background can be selected at a time, 
+                and it will automatically fill the entire canvas.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-gray-800 mb-1">3. Add Trees</h4>
+              <p className="text-gray-600 text-sm">
+                - Select "Trees" from the menu to see available trees<br/>
+                - Click on a tree to add it to your canvas (you can add multiple trees!)<br/>
+                - On mobile: Click a tree to see its variants (.2, .3, .4) below<br/>
+                - On desktop: Tree variants appear next to the selected tree
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-gray-800 mb-1">4. Add Decorations</h4>
+              <p className="text-gray-600 text-sm">
+                Use the "Items", "Pets", "Ribbons", or "Siggy" menu to add decorations. 
                 Click on an item to place it on the canvas.
               </p>
             </div>
 
             <div>
-              <h4 className="font-bold text-gray-800 mb-1">3. Move and Adjust</h4>
+              <h4 className="font-bold text-gray-800 mb-1">5. Move and Adjust</h4>
               <p className="text-gray-600 text-sm">
-                - Drag and drop to move items<br/>
-                - Drag corners to resize<br/>
-                - Hover over an item to see the rotation button at the bottom-right corner, then drag it to rotate<br/>
-                - Double click (or double tap on mobile) to remove an item
+                - <strong>Drag</strong> items to move them around<br/>
+                - <strong>Resize</strong> by dragging the corners<br/>
+                - <strong>Rotate</strong> by hovering over an item and dragging the rotation handle at the bottom-right corner<br/>
+                - <strong>Delete</strong> items by double-clicking (or double-tapping on mobile)<br/>
+                - <strong>Delete trees</strong> by double-clicking on them or using the delete button (🗑️) when hovering
               </p>
             </div>
 
             <div>
-              <h4 className="font-bold text-gray-800 mb-1">4. Save and Share</h4>
+              <h4 className="font-bold text-gray-800 mb-1">6. Save and Share</h4>
               <p className="text-gray-600 text-sm">
-                - Click "Save" to save your progress<br/>
-                - Click "Clear" to remove everything and start over<br/>
-                - Click "Share to X" to export an image and share on X (Twitter)
+                - Click <strong>"Save"</strong> to save your progress locally<br/>
+                - Click <strong>"Clear"</strong> to remove everything and start over<br/>
+                - Click <strong>"Share to X"</strong> to export an image and share on X (Twitter)
               </p>
             </div>
 
             <div>
-              <h4 className="font-bold text-gray-800 mb-1">5. Share on X</h4>
+              <h4 className="font-bold text-gray-800 mb-1">7. Share on X</h4>
               <p className="text-gray-600 text-sm">
                 After exporting the image, you can:<br/>
                 - Copy the image to your clipboard<br/>
@@ -89,7 +109,11 @@ export default function GuideModal({
 
           <div className="mt-4 p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800">
-              <strong>💡 Tip:</strong> You can add multiple items and arrange them as you like to create a unique decoration!
+              <strong>💡 Tips:</strong><br/>
+              • You can add multiple trees and decorations to create a unique scene!<br/>
+              • On mobile, scroll horizontally to see all items in the menu<br/>
+              • Use the rotation controls to fine-tune your decoration angles<br/>
+              • Backgrounds automatically fill the canvas - no resizing needed!
             </p>
           </div>
         </div>
