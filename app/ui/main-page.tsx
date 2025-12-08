@@ -35,7 +35,7 @@ export default function MainPage({
   const treeMenuRef = React.useRef<HTMLDivElement>(null);
 
   // State
-  const [selectedMenu, setSelectedMenu] = useState<'trees' | 'pets' | 'ribbons' | 'items' | 'backgrounds' | 'siggy'>('trees');
+  const [selectedMenu, setSelectedMenu] = useState<'trees' | 'pets' | 'ribbons' | 'items' | 'backgrounds' | 'siggy' | null>(null);
   const [currentTrees, setCurrentTrees] = useState<TreeState[]>([]);
   const [treeNextId, setTreeNextId] = useState(0);
   const [currentBackground, setCurrentBackground] = useState<string | null>(null);
@@ -1292,7 +1292,7 @@ toast.success("All decorations cleared, reverted to default");
       </div>
 
       {/* Menu buttons - RIGHT side on desktop, BOTTOM on mobile - Christmas themed */}
-      <div className="fixed bottom-0 md:bottom-auto md:top-20 md:right-3 z-10">
+      <div className="fixed bottom-0 md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:right-3 z-10">
         <div className="christmas-menu flex flex-row w-screen justify-center md:flex-col md:w-fit rounded-t-xl md:rounded-xl p-1.5 md:p-2 relative">
           {/* Title - show on both mobile and desktop */}
           <div className="text-center mb-1 md:mb-2 pb-1 md:pb-2 border-b-2 border-yellow-500/50 w-full md:w-auto">
@@ -1343,20 +1343,21 @@ toast.success("All decorations cleared, reverted to default");
         </div>
       </div>
 
-      {/* Item list - LEFT side on desktop - Christmas themed */}
-      <div className="fixed top-20 left-0 md:left-3 z-10 hidden md:block">
-        <div className="christmas-item-list max-h-[70vh] overflow-y-auto overflow-x-hidden scrollbar-visible rounded-xl p-3 relative">
-          {/* Title */}
-          <div className="text-center mb-3 pb-2 border-b-2 border-yellow-500/50">
-            <span className="text-yellow-400 font-bold text-sm">
-              {selectedMenu === 'trees' && '🎄 TREES 🎄'}
-              {selectedMenu === 'pets' && '🐾 PETS 🐾'}
-              {selectedMenu === 'ribbons' && '🎀 RIBBONS 🎀'}
-              {selectedMenu === 'items' && '🎁 ITEMS 🎁'}
-              {selectedMenu === 'backgrounds' && '🖼️ Backgrounds 🖼️'}
-              {selectedMenu === 'siggy' && '✨ SIGGY ✨'}
-            </span>
-          </div>
+      {/* Item list - LEFT side on desktop - Christmas themed - only show when menu is selected */}
+      {selectedMenu && (
+        <div className="fixed top-20 left-0 md:left-3 z-10 hidden md:block">
+          <div className="christmas-item-list max-h-[70vh] overflow-y-auto overflow-x-hidden scrollbar-visible rounded-xl p-3 relative">
+            {/* Title */}
+            <div className="text-center mb-3 pb-2 border-b-2 border-yellow-500/50">
+              <span className="text-yellow-400 font-bold text-sm">
+                {selectedMenu === 'trees' && '🎄 TREES 🎄'}
+                {selectedMenu === 'pets' && '🐾 PETS 🐾'}
+                {selectedMenu === 'ribbons' && '🎀 RIBBONS 🎀'}
+                {selectedMenu === 'items' && '🎁 ITEMS 🎁'}
+                {selectedMenu === 'backgrounds' && '🖼️ Backgrounds 🖼️'}
+                {selectedMenu === 'siggy' && '✨ SIGGY ✨'}
+              </span>
+            </div>
           
           <div ref={treeMenuRef} className="w-fit">
             {/* Tree menu - showing all 5 trees */}
@@ -1417,22 +1418,24 @@ toast.success("All decorations cleared, reverted to default");
             )}
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
-      {/* Mobile item list - bottom, above menu buttons - Christmas themed */}
-      <div className="fixed bottom-20 left-0 right-0 z-10 md:hidden">
-        <div className="christmas-item-list max-h-[40vh] overflow-x-auto overflow-y-hidden scrollbar-visible rounded-t-xl mx-2">
-          {/* Title for mobile */}
-          <div className="text-center py-2 px-2 border-b-2 border-yellow-500/50 sticky top-0 bg-gradient-to-b from-green-900/95 to-green-800/95 z-10">
-            <span className="text-yellow-400 font-bold text-xs">
-              {selectedMenu === 'trees' && '🎄 TREES 🎄'}
-              {selectedMenu === 'pets' && '🐾 PETS 🐾'}
-              {selectedMenu === 'ribbons' && '🎀 RIBBONS 🎀'}
-              {selectedMenu === 'items' && '🎁 ITEMS 🎁'}
-              {selectedMenu === 'backgrounds' && '🖼️ BACKGROUNDS 🖼️'}
-              {selectedMenu === 'siggy' && '✨ SIGGY ✨'}
-            </span>
-          </div>
+      {/* Mobile item list - bottom, above menu buttons - Christmas themed - only show when menu is selected */}
+      {selectedMenu && (
+        <div className="fixed bottom-20 left-0 right-0 z-10 md:hidden">
+          <div className="christmas-item-list max-h-[40vh] overflow-x-auto overflow-y-hidden scrollbar-visible rounded-t-xl mx-2">
+            {/* Title for mobile */}
+            <div className="text-center py-2 px-2 border-b-2 border-yellow-500/50 sticky top-0 bg-gradient-to-b from-green-900/95 to-green-800/95 z-10">
+              <span className="text-yellow-400 font-bold text-xs">
+                {selectedMenu === 'trees' && '🎄 TREES 🎄'}
+                {selectedMenu === 'pets' && '🐾 PETS 🐾'}
+                {selectedMenu === 'ribbons' && '🎀 RIBBONS 🎀'}
+                {selectedMenu === 'items' && '🎁 ITEMS 🎁'}
+                {selectedMenu === 'backgrounds' && '🖼️ BACKGROUNDS 🖼️'}
+                {selectedMenu === 'siggy' && '✨ SIGGY ✨'}
+              </span>
+            </div>
           <div className="p-2">
             {/* Tree menu for mobile - horizontal scroll layout */}
             {selectedMenu === 'trees' && (
@@ -1514,7 +1517,8 @@ toast.success("All decorations cleared, reverted to default");
             )}
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Main decoration canvas - Christmas border - responsive spacing */}
       <div className="w-[calc(100%-20px)] md:w-[100vmin] max-w-3xl aspect-video border-4 border-yellow-500 overflow-hidden absolute top-[190px] md:top-[calc(50px+5rem+30px)] md:left-1/2 md:-translate-x-1/2 md:right-auto md:m-0 left-[10px] right-[10px] m-auto rounded-2xl shadow-[0_0_30px_rgba(255,215,0,0.3),0_0_60px_rgba(255,0,0,0.2)]">
