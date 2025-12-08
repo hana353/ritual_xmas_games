@@ -12,7 +12,7 @@ export default function DecorItem({
 }) {
   return (
     <button
-      className={`christmas-item w-16 h-16 m-1 inline-flex cursor-pointer items-center justify-center overflow-hidden flex-shrink-0 ${
+      className={`christmas-item w-full h-full md:w-16 md:h-16 md:m-1 inline-flex cursor-pointer items-center justify-center overflow-hidden flex-shrink-0 aspect-square ${
         isSelected ? 'selected' : ''
       }`}
       onClick={handleOnClick}
@@ -20,7 +20,7 @@ export default function DecorItem({
       <img
         src={`${prefix}/${imageSrc}`}
         alt="Decoration item"
-        className="w-12 h-12 object-contain drop-shadow-lg"
+        className="w-full h-full md:w-12 md:h-12 object-contain drop-shadow-lg p-1"
       />
     </button>
   );

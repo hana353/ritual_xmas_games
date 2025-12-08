@@ -7,6 +7,7 @@ export type DraggableItem = {
 }
 
 export type TreeState = {
+  id: number;
   imageSrc: string;
   x: number; 
   y: number;

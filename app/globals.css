@@ -86,7 +86,7 @@ body::before {
 
 .blink-red-yellow {
   position: absolute;
-  bottom: calc(30px + 60vh + 20px);
+  top: 50px;
   left: 50%;
   transform: translateX(-50%);
   font-size: 3.2rem;
@@ -106,21 +106,27 @@ body::before {
 /* Mobile adjustments for Merry Christmas text */
 @media (max-width: 768px) {
   .blink-red-yellow {
-    font-size: 2.4rem;
-    padding: 10px 20px;
-    letter-spacing: 1.5px;
-    bottom: calc(30px + 100vmin * 9/16 + 20px);
+    font-size: 2rem;
+    padding: 8px 16px;
+    letter-spacing: 1px;
+    top: 25px;
+    bottom: auto;
     border-radius: 12px;
+    max-width: calc(100% - 20px);
+    left: 50%;
+    transform: translateX(-50%);
   }
 }
 
 @media (max-width: 480px) {
   .blink-red-yellow {
-    font-size: 2rem;
-    padding: 8px 18px;
-    letter-spacing: 1px;
-    bottom: calc(30px + 100vmin * 9/16 + 15px);
+    font-size: 1.75rem;
+    padding: 6px 14px;
+    letter-spacing: 0.5px;
+    top: 130px;
+    bottom: auto;
     border-radius: 10px;
+    max-width: 95%;
   }
 }
 
@@ -279,4 +285,43 @@ body::before {
 .christmas-corner::after {
   top: -8px;
   right: -8px;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .christmas-menu {
+    padding: 0.5rem;
+  }
+  
+  .christmas-menu-btn {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .christmas-item-list {
+    max-height: 40vh;
+    border-width: 2px;
+  }
+  
+  .christmas-item {
+    border-radius: 8px;
+    border-width: 1.5px;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 1;
+  }
+  
+  /* Improve touch targets on mobile */
+  .christmas-item,
+  .christmas-menu-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Grid items should fill container */
+  .christmas-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
 }

@@ -1,12 +1,12 @@
 import DecorItemElement from "@/app/ui/decor-item-element";
 import { DraggableItem, TreeState } from "@/app/lib/definitions";
-import { DraggableEventHandler } from "react-draggable";
-import { Rnd, RndResizeCallback } from "react-rnd";
+import { DraggableEventHandler, DraggableEvent, DraggableData } from "react-draggable";
+import { Rnd, RndResizeCallback, ResizeDirection, ResizableDelta, Position } from "react-rnd";
 import { MouseEventHandler, TouchEventHandler } from "react";
 import { prefix } from "@/app/lib/prefix";
 
 export default function DecorBox({
-  tree,
+  trees,
   background,
   decorItems,
   exportNodeRef,
@@ -19,9 +19,11 @@ export default function DecorBox({
   onTreeDragStop,
   onTreeResizeStop,
   onTreeRotate,
-  onTreeResize
+  onTreeResize,
+  onTreeDelete,
+  onTreeTouchStart
 }: {
-  tree: TreeState | null,
+  trees: TreeState[],
   background: string | null,
   decorItems: DraggableItem[],
   exportNodeRef: React.RefObject<HTMLDivElement | null>,
@@ -31,10 +33,12 @@ export default function DecorBox({
   onTouchStart: TouchEventHandler<HTMLImageElement>,
   onRotate: (id: number, delta: number) => void,
   onResize?: (id: number, width: number, height: number) => void,
-  onTreeDragStop: DraggableEventHandler,
-  onTreeResizeStop: RndResizeCallback,
-  onTreeRotate: (delta: number) => void,
-  onTreeResize?: (width: number, height: number) => void
+  onTreeDragStop: (id: number, e: DraggableEvent, data: DraggableData) => void,
+  onTreeResizeStop: (id: number, e: MouseEvent | TouchEvent, direction: ResizeDirection, ref: HTMLElement, delta: ResizableDelta, position: Position) => void,
+  onTreeRotate: (id: number, delta: number) => void,
+  onTreeResize?: (id: number, width: number, height: number) => void,
+  onTreeDelete?: (id: number) => void,
+  onTreeTouchStart?: TouchEventHandler<HTMLImageElement>
 }) {
   return (
     <div ref={exportNodeRef} className="w-full h-full relative">
@@ -51,13 +55,14 @@ export default function DecorBox({
         }}
       />
       
-      {/* Tree layer - draggable and resizable freely like other items */}
-      {tree && (
+      {/* Trees layer - draggable and resizable freely like other items */}
+      {trees.map((tree) => (
         <Rnd
+          key={`tree-${tree.id}`}
           position={{ x: tree.x, y: tree.y }}
           size={{ width: tree.width, height: tree.height }}
-          onDragStop={onTreeDragStop}
-          onResizeStop={onTreeResizeStop}
+          onDragStop={(e, data) => onTreeDragStop(tree.id, e, data)}
+          onResizeStop={(e, direction, ref, delta, position) => onTreeResizeStop(tree.id, e, direction, ref, delta, position)}
           minWidth={1}
           minHeight={1}
           className="group hover:border-2 hover:border-green-400 active:border-2 active:border-green-400"
@@ -70,41 +75,53 @@ export default function DecorBox({
             }}
           >
             <img
+              id={`tree-${tree.id}`}
               src={`${prefix}/${tree.imageSrc}`}
               alt="Decoration tree"
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain cursor-pointer"
               draggable={false}
+              onDoubleClick={() => onTreeDelete?.(tree.id)}
+              onTouchStart={onTreeTouchStart}
+              data-tree-id={tree.id}
             />
             {/* Tree controls - show on hover */}
-            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-black/50 rounded px-2 py-1">
+            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-black/50 rounded px-2 py-1 z-10">
               <button
                 className="text-white text-xs px-2 py-1 bg-blue-500 rounded hover:bg-blue-600"
-                onClick={(e) => { e.stopPropagation(); onTreeRotate(-15); }}
+                onClick={(e) => { e.stopPropagation(); onTreeRotate(tree.id, -15); }}
               >
                 ↺
               </button>
               <button
                 className="text-white text-xs px-2 py-1 bg-blue-500 rounded hover:bg-blue-600"
-                onClick={(e) => { e.stopPropagation(); onTreeRotate(15); }}
+                onClick={(e) => { e.stopPropagation(); onTreeRotate(tree.id, 15); }}
               >
                 ↻
               </button>
               <button
                 className="text-white text-xs px-2 py-1 bg-green-500 rounded hover:bg-green-600"
-                onClick={(e) => { e.stopPropagation(); onTreeResize?.(tree.width + 20, tree.height + 20); }}
+                onClick={(e) => { e.stopPropagation(); onTreeResize?.(tree.id, tree.width + 20, tree.height + 20); }}
               >
                 +
               </button>
               <button
                 className="text-white text-xs px-2 py-1 bg-red-500 rounded hover:bg-red-600"
-                onClick={(e) => { e.stopPropagation(); onTreeResize?.(Math.max(50, tree.width - 20), Math.max(50, tree.height - 20)); }}
+                onClick={(e) => { e.stopPropagation(); onTreeResize?.(tree.id, Math.max(50, tree.width - 20), Math.max(50, tree.height - 20)); }}
               >
                 −
               </button>
+              {onTreeDelete && (
+                <button
+                  className="text-white text-xs px-2 py-1 bg-red-600 rounded hover:bg-red-700"
+                  onClick={(e) => { e.stopPropagation(); onTreeDelete(tree.id); }}
+                >
+                  🗑️
+                </button>
+              )}
             </div>
           </div>
         </Rnd>
-      )}
+      ))}
       
       {/* Decoration items layer - on top */}
       {decorItems.map((item) => (
