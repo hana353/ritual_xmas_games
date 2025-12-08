@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from "react";
-import { DraggableItem } from "@/app/lib/definitions";
+import { DraggableItem, TreeState } from "@/app/lib/definitions";
 import { DraggableEvent } from "react-draggable";
 import { DraggableData, Position, ResizableDelta } from "react-rnd";
 import { ResizeDirection } from "re-resizable";
@@ -20,19 +20,24 @@ export default function MainPage({
   itemLinks,
   petLinks,
   ribbonLinks,
+  backgroundLinks,
+  siggyLinks,
 }: {
   treeLinks: string[],
   itemLinks: string[],
   petLinks: string[],
   ribbonLinks: string[],
+  backgroundLinks: string[],
+  siggyLinks: string[],
 }) {
   // Node refs
   const exportNodeRef = React.useRef<HTMLDivElement>(null);
   const treeMenuRef = React.useRef<HTMLDivElement>(null);
 
   // State
-  const [selectedMenu, setSelectedMenu] = useState<'trees' | 'pets' | 'ribbons' | 'items'>('trees');
-  const [currentTree, setCurrentTree] = useState(treeLinks[0] || "");
+  const [selectedMenu, setSelectedMenu] = useState<'trees' | 'pets' | 'ribbons' | 'items' | 'backgrounds' | 'siggy'>('trees');
+  const [currentTree, setCurrentTree] = useState<TreeState | null>(null);
+  const [currentBackground, setCurrentBackground] = useState<string | null>(null);
   const [currentMenu, setCurrentMenu] = useState<string[]>([]);
   const [treeSubMenu, setTreeSubMenu] = useState<string[]>([]);
   const [decorItems, setDecorItems] = useState<DraggableItem[]>([]);
@@ -47,7 +52,15 @@ export default function MainPage({
 
   // Handle saved session
   useEffect(() => {
-    setCurrentTree(localStorage.getItem("currentTree") || treeLinks[0]);
+    const savedTreeJson = localStorage.getItem("currentTree");
+    if (savedTreeJson) {
+      try {
+        setCurrentTree(JSON.parse(savedTreeJson) as TreeState);
+      } catch {
+        setCurrentTree(null);
+      }
+    }
+    setCurrentBackground(localStorage.getItem("currentBackground") || null);
 
     const savedDecorItemsJson = localStorage.getItem("currentItems") || "[]";
     const savedDecorItems = JSON.parse(savedDecorItemsJson) as Array<DraggableItem>;
@@ -65,6 +78,8 @@ export default function MainPage({
       case "pets": setCurrentMenu(petLinks); break;
       case "ribbons": setCurrentMenu(ribbonLinks); break;
       case "items": setCurrentMenu(itemLinks); break;
+      case "backgrounds": setCurrentMenu(backgroundLinks); break;
+      case "siggy": setCurrentMenu(siggyLinks); break;
     }
   }, [selectedMenu]);
 
@@ -160,22 +175,59 @@ function addDecorItem(imgLink: string) {
     }));
   }
 
+  // Tree handlers
+  function handleTreeDragStop(e: DraggableEvent, data: DraggableData) {
+    if (!currentTree) return;
+    setCurrentTree({ ...currentTree, x: data.x, y: data.y });
+  }
+
+  function handleTreeResizeStop(e: MouseEvent | TouchEvent, direction: ResizeDirection, ref: HTMLElement, delta: ResizableDelta, position: Position) {
+    if (!currentTree) return;
+    setCurrentTree({ 
+      ...currentTree, 
+      ...position, 
+      width: ref.offsetWidth, 
+      height: ref.offsetHeight 
+    });
+  }
+
+  function handleTreeRotate(delta: number) {
+    if (!currentTree) return;
+    setCurrentTree({ ...currentTree, rotation: (currentTree.rotation + delta) % 360 });
+  }
+
+  function handleTreeResize(width: number, height: number) {
+    if (!currentTree) return;
+    setCurrentTree({ ...currentTree, width, height });
+  }
+
   function handleSave() {
-    localStorage.setItem("currentTree", currentTree);
+    if (currentTree) {
+      localStorage.setItem("currentTree", JSON.stringify(currentTree));
+    } else {
+      localStorage.removeItem("currentTree");
+    }
     localStorage.setItem("currentItems", JSON.stringify(decorItems));
+    if (currentBackground) {
+      localStorage.setItem("currentBackground", currentBackground);
+    } else {
+      localStorage.removeItem("currentBackground");
+    }
     toast("Saved decoration successfully");
   }
 
   function handleClear() {
     // Reset to default state
     setDecorItems([]);
-    setCurrentTree(treeLinks[0] || "");
+    setCurrentTree(null);
+    setCurrentBackground(null);
     setNextId(0);
     setTreeSubMenu([]);
     
     // Clear localStorage
     localStorage.removeItem("currentTree");
     localStorage.removeItem("currentItems");
+    localStorage.removeItem("currentBackground");
     
 toast.success("All decorations cleared, reverted to default");
   }
@@ -192,14 +244,15 @@ toast.success("All decorations cleared, reverted to default");
     if (exportNodeRef.current) {
       const allImages = Array.from(exportNodeRef.current.querySelectorAll('img')) as HTMLImageElement[];
       const reloadPromises: Promise<void>[] = [];
-      const expectedTreeSrc = `${prefix}/${currentTree}`;
+      const treeSrc = currentTree?.imageSrc || '';
+      const expectedTreeSrc = `${prefix}/${treeSrc}`;
       
       for (const img of allImages) {
         const itemId = img.getAttribute('data-item-id');
         const expectedSrc = img.getAttribute('data-image-src');
         
         // Check if this is tree image (no data-item-id, but src matches currentTree)
-        const isTreeImage = !itemId && (img.src.includes(currentTree) || img.alt === 'Decoration tree');
+        const isTreeImage = !itemId && (img.src.includes(treeSrc) || img.alt === 'Decoration tree');
         
         if (isTreeImage) {
           // Force reload tree image with cache busting
@@ -454,21 +507,22 @@ toast.success("All decorations cleared, reverted to default");
       // Don't reset src as it causes Next.js Image cache issues where items get replaced with tree
       const allImages = Array.from(node.querySelectorAll('img')) as HTMLImageElement[];
       const imageSrcs = new Map<string, { expected: string; current: string }>();
-      const expectedTreeSrc = `${prefix}/${currentTree}`;
+      const treeSrcForExport = currentTree?.imageSrc || '';
+      const expectedTreeSrc = `${prefix}/${treeSrcForExport}`;
       
        // Store expected srcs from data attributes to verify they don't change
        // Check both decoration items and tree image
        for (const img of allImages) {
          const itemId = img.getAttribute('data-item-id');
          const expectedSrc = img.getAttribute('data-image-src');
-         const isTreeImage = !itemId && (img.src.includes(currentTree) || img.alt === 'Decoration tree');
+         const isTreeImage = !itemId && (img.src.includes(treeSrcForExport) || img.alt === 'Decoration tree');
          
          // Verify tree image first
          if (isTreeImage) {
            const currentSrc = img.src || '';
-           const treeSrcCorrect = currentSrc.includes(currentTree) || 
+           const treeSrcCorrect = currentSrc.includes(treeSrcForExport) || 
                                  currentSrc === expectedTreeSrc ||
-                                 currentSrc.includes(encodeURIComponent(currentTree));
+                                 currentSrc.includes(encodeURIComponent(treeSrcForExport));
            
            if (!treeSrcCorrect || !img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
              console.warn('Tree image not correct or not loaded, fixing...', {
@@ -601,14 +655,14 @@ toast.success("All decorations cleared, reverted to default");
         for (const img of allImages) {
           const itemId = img.getAttribute('data-item-id');
           const expectedSrc = img.getAttribute('data-image-src');
-          const isTreeImage = !itemId && (img.src.includes(currentTree) || img.alt === 'Decoration tree');
+          const isTreeImage = !itemId && (img.src.includes(treeSrcForExport) || img.alt === 'Decoration tree');
           
           // Verify tree image
           if (isTreeImage) {
             const currentSrc = img.src || '';
-            const treeSrcCorrect = currentSrc.includes(currentTree) || 
+            const treeSrcCorrect = currentSrc.includes(treeSrcForExport) || 
                                   currentSrc === expectedTreeSrc ||
-                                  currentSrc.includes(encodeURIComponent(currentTree));
+                                  currentSrc.includes(encodeURIComponent(treeSrcForExport));
             const isLoaded = img.complete && img.naturalHeight > 0 && img.naturalWidth > 0;
             
             if (!isLoaded || !treeSrcCorrect) {
@@ -754,14 +808,14 @@ toast.success("All decorations cleared, reverted to default");
       for (const img of finalImages) {
         const itemId = img.getAttribute('data-item-id');
         const expectedSrc = img.getAttribute('data-image-src');
-        const isTreeImage = !itemId && (img.src.includes(currentTree) || img.alt === 'Decoration tree');
+        const isTreeImage = !itemId && (img.src.includes(treeSrcForExport) || img.alt === 'Decoration tree');
         
         // Verify tree image in final check
         if (isTreeImage) {
           const currentSrc = img.src || '';
-          const treeSrcCorrect = currentSrc.includes(currentTree) || 
+          const treeSrcCorrect = currentSrc.includes(treeSrcForExport) || 
                                 currentSrc === expectedTreeSrc ||
-                                currentSrc.includes(encodeURIComponent(currentTree));
+                                currentSrc.includes(encodeURIComponent(treeSrcForExport));
           const isLoaded = img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
           
           if (!treeSrcCorrect || !isLoaded) {
@@ -1148,130 +1202,224 @@ toast.success("All decorations cleared, reverted to default");
       {/* Merry Christmas blinking text */}
       <h1 className="blink-red-yellow whitespace-nowrap">Merry Christmas</h1>
 
-      {/* Save, Clear, Guide and share */}
-      <div className="absolute z-20 top-3 right-3 flex gap-1">
+      {/* Save, Clear, Guide and share - Christmas themed */}
+      <div className="absolute z-20 top-3 right-3 flex gap-2">
         <button
-          className="bg-blue-400 hover:bg-blue-500 p-1 rounded-md"
+          className="christmas-menu-btn px-3 py-1.5 rounded-lg text-sm"
           onClick={handleSave}
         >
-          <span className="font-bold">Save</span>
+          💾 Save
         </button>
         <button
-          className="bg-red-400 hover:bg-red-500 p-1 rounded-md"
+          className="christmas-menu-btn px-3 py-1.5 rounded-lg text-sm"
           onClick={handleClear}
         >
-          <span className="font-bold">Clear</span>
+          🗑️ Clear
         </button>
         <button
-          className="bg-green-400 hover:bg-green-500 p-1 rounded-md"
+          className="christmas-menu-btn px-3 py-1.5 rounded-lg text-sm"
           onClick={() => setGuideModalOpen(true)}
         >
-          <span className="font-bold">Guide</span>
+          📖 Guide
         </button>
         <button
-          className="bg-black hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed p-1 rounded-md text-white"
+          className="christmas-menu-btn active px-3 py-1.5 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleExport}
           disabled={isExporting}
         >
-          <span className="font-bold">{isExporting ? 'Preparing...' : 'Share to X'}</span>
+          {isExporting ? '⏳ Preparing...' : '🐦 Share to X'}
         </button>
       </div>
 
-      {/* Menu */}
-      <div className="fixed bottom-0 md:m-0 md:top-19.75 md:translate-y-0 md:h-fit">
-        <div className="flex flex-row w-screen bg-blue-500/25 justify-center md:flex-col md:w-fit md:mb-4 rounded-[7%]">
+      {/* Menu buttons - RIGHT side on desktop - Christmas themed */}
+      <div className="fixed bottom-0 md:bottom-auto md:top-20 md:right-3 z-10">
+        <div className="christmas-menu flex flex-row w-screen justify-center md:flex-col md:w-fit rounded-xl p-2 relative">
+          {/* Title */}
+          <div className="hidden md:block text-center mb-2 pb-2 border-b-2 border-yellow-500/50">
+            <span className="text-yellow-400 font-bold text-sm">🎄 MENU 🎄</span>
+          </div>
           <button
-            className={`m-2 p-2 font-bold rounded-md ${selectedMenu === 'trees' ? 'bg-blue-700' : 'bg-blue-300'}`}
+            className={`christmas-menu-btn m-1 px-4 py-2 rounded-lg text-sm ${selectedMenu === 'trees' ? 'active' : ''}`}
             onClick={() => setSelectedMenu('trees')}
             aria-pressed={selectedMenu === 'trees'}
           >
-            Trees
+            🎄 Trees
           </button>
           <button
-            className={`m-2 p-2 font-bold rounded-md ${selectedMenu === 'pets' ? 'bg-blue-700' : 'bg-blue-300'}`}
+            className={`christmas-menu-btn m-1 px-4 py-2 rounded-lg text-sm ${selectedMenu === 'pets' ? 'active' : ''}`}
             onClick={() => setSelectedMenu('pets')}
             aria-pressed={selectedMenu === 'pets'}
           >
-            Pets
+            🐾 Pets
           </button>
           <button
-            className={`m-2 p-2 font-bold rounded-md ${selectedMenu === 'ribbons' ? 'bg-blue-700' : 'bg-blue-300'}`}
+            className={`christmas-menu-btn m-1 px-4 py-2 rounded-lg text-sm ${selectedMenu === 'ribbons' ? 'active' : ''}`}
             onClick={() => setSelectedMenu('ribbons')}
             aria-pressed={selectedMenu === 'ribbons'}
           >
-            Ribbons
+            🎀 Ribbons
           </button>
           <button
-            className={`m-2 p-2 font-bold rounded-md ${selectedMenu === 'items' ? 'bg-blue-700' : 'bg-blue-300'}`}
+            className={`christmas-menu-btn m-1 px-4 py-2 rounded-lg text-sm ${selectedMenu === 'items' ? 'active' : ''}`}
             onClick={() => setSelectedMenu('items')}
             aria-pressed={selectedMenu === 'items'}
           >
-            Items
+            🎁 Items
+          </button>
+          <button
+            className={`christmas-menu-btn m-1 px-4 py-2 rounded-lg text-sm ${selectedMenu === 'backgrounds' ? 'active' : ''}`}
+            onClick={() => setSelectedMenu('backgrounds')}
+            aria-pressed={selectedMenu === 'backgrounds'}
+          >
+            🖼️ Background
+          </button>
+          <button
+            className={`christmas-menu-btn m-1 px-4 py-2 rounded-lg text-sm ${selectedMenu === 'siggy' ? 'active' : ''}`}
+            onClick={() => setSelectedMenu('siggy')}
+            aria-pressed={selectedMenu === 'siggy'}
+          >
+            ✨ Siggy
           </button>
         </div>
+      </div>
 
-        {/* Tree and item menu */}
-        <div className="md:h-fit md:max-h-[60vh] overflow-x-scroll overflow-y-hidden md:overflow-x-hidden md:overflow-y-scroll scrollbar-visible bg-blue-500/25 rounded-[7%]">
-          <div ref={treeMenuRef} className="w-screen whitespace-nowrap md:w-fit md:max-h-full">
-            {/* Tree menu */}
-            <ul className="flex flex-row md:flex-col">
+      {/* Item list - LEFT side on desktop - Christmas themed */}
+      <div className="fixed top-20 left-0 md:left-3 z-10 hidden md:block">
+        <div className="christmas-item-list max-h-[70vh] overflow-y-auto overflow-x-hidden scrollbar-visible rounded-xl p-3 relative">
+          {/* Title */}
+          <div className="text-center mb-3 pb-2 border-b-2 border-yellow-500/50">
+            <span className="text-yellow-400 font-bold text-sm">
+              {selectedMenu === 'trees' && '🎄 TREES 🎄'}
+              {selectedMenu === 'pets' && '🐾 PETS 🐾'}
+              {selectedMenu === 'ribbons' && '🎀 RIBBONS 🎀'}
+              {selectedMenu === 'items' && '🎁 ITEMS 🎁'}
+              {selectedMenu === 'backgrounds' && '🖼️ Backgrounds 🖼️'}
+              {selectedMenu === 'siggy' && '✨ SIGGY ✨'}
+            </span>
+          </div>
+          
+          <div ref={treeMenuRef} className="w-fit">
+            {/* Tree menu - showing all 5 trees */}
+            <div className="flex flex-col flex-nowrap gap-1">
               {selectedMenu === 'trees' &&
                 treeLinks
                   .filter(link => link.endsWith(".1.png"))
                   .map((link, idx) => (
-                    <li key={link}>
+                    <div key={link} className="flex flex-row items-center">
                       <button
-                        className={`w-16 h-16 m-3 inline-block peer ${currentTree === link ? 'ring-4 ring-yellow-300 bg-blue-700' : 'bg-blue-500/50'}`}
+                        className={`christmas-item w-16 h-16 m-1 inline-flex items-center justify-center flex-shrink-0 ${currentTree?.imageSrc === link ? 'selected' : ''}`}
                         onClick={() => {
-                          setCurrentTree(link);
-                          setTreeSubMenu(treeLinks.filter(link => link.startsWith(`trees/${idx + 1}`) && (link.split('/').pop() || link) !== `${idx + 1}.1.png`));
+                          setCurrentTree({
+                            imageSrc: link,
+                            x: 0, y: 0,
+                            width: 300, height: 400,
+                            rotation: 0
+                          });
+                          setTreeSubMenu(treeLinks.filter(l => l.startsWith(`trees/${idx + 1}`) && (l.split('/').pop() || l) !== `${idx + 1}.1.png`));
                         }}
                       >
                         <img
-                          src={link}
+                          src={`${prefix}/${link}`}
                           alt="Decoration tree"
-                          width={40} height={40}
-                          className="w-fit h-fit m-auto"
+                          className="w-12 h-12 object-contain drop-shadow-lg"
                         />
                       </button>
-                      <ul className="relative rounded-md md:absolute bg-red-300 hidden peer-[.ring-yellow-300]:inline-block md:ml-5">
-                        {treeSubMenu.length > 0 && treeSubMenu.map(link => (
-                          <li
-                            key={link}
-                            className="inline-block"
-                          >
+                      {/* Sub menu for tree variants .2 .3 .4 */}
+                      {currentTree?.imageSrc === link && treeSubMenu.length > 0 && (
+                        <div className="christmas-submenu flex flex-row items-center rounded-lg ml-2 p-1">
+                          {treeSubMenu.map(subLink => (
                             <DecorItem
-                              imageSrc={link}
-                              handleOnClick={() => addDecorItem(link)}
+                              key={subLink}
+                              imageSrc={subLink}
+                              handleOnClick={() => addDecorItem(subLink)}
                             />
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  )
-                  )
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
               }
-            </ul>
-          </div>
-
-          {/* Item menu */}
-          {selectedMenu !== 'trees' && (
-            <div className="w-screen whitespace-nowrap md:w-fit md:flex md:flex-col">
-              {currentMenu.map(link => (
-                <DecorItem
-                  key={link}
-                  imageSrc={link}
-                  handleOnClick={() => addDecorItem(link)}
-                />
-              ))}
             </div>
-          )}
+
+            {/* Item menu - grid layout for better display */}
+            {selectedMenu !== 'trees' && (
+              <div className="grid grid-cols-2 gap-1">
+                {currentMenu.map(link => (
+                  <DecorItem
+                    key={link}
+                    imageSrc={link}
+                    isSelected={selectedMenu === 'backgrounds' && currentBackground === link}
+                    handleOnClick={() => {
+                      if (selectedMenu === 'backgrounds') {
+                        setCurrentBackground(link);
+                      } else {
+                        addDecorItem(link);
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="w-[100vmin] max-w-3xl aspect-video border-8 border-solid border-blue-300 overflow-hidden absolute top-0 bottom-0 left-0 right-0 m-auto rounded-[7%]">
+      {/* Mobile item list - bottom, above menu buttons - Christmas themed */}
+      <div className="fixed bottom-20 left-0 right-0 z-10 md:hidden">
+        <div className="christmas-item-list max-h-24 overflow-x-auto overflow-y-hidden scrollbar-visible rounded-t-xl mx-2">
+          <div className="flex flex-row whitespace-nowrap p-2 gap-1">
+            {/* Tree menu for mobile */}
+            {selectedMenu === 'trees' &&
+              treeLinks
+                .filter(link => link.endsWith(".1.png"))
+                .map((link, idx) => (
+                  <button
+                    key={link}
+                    className={`christmas-item w-16 h-16 mx-1 flex-shrink-0 inline-flex items-center justify-center ${currentTree?.imageSrc === link ? 'selected' : ''}`}
+                    onClick={() => {
+                      setCurrentTree({
+                        imageSrc: link,
+                        x: 0, y: 0,
+                        width: 300, height: 400,
+                        rotation: 0
+                      });
+                    }}
+                  >
+                    <img
+                      src={`${prefix}/${link}`}
+                      alt="Decoration tree"
+                      className="w-12 h-12 object-contain drop-shadow-lg"
+                    />
+                  </button>
+                ))
+            }
+            {/* Other items for mobile */}
+            {selectedMenu !== 'trees' &&
+              currentMenu.map(link => (
+                <div key={link} className="flex-shrink-0">
+                  <DecorItem
+                    imageSrc={link}
+                    isSelected={selectedMenu === 'backgrounds' && currentBackground === link}
+                    handleOnClick={() => {
+                      if (selectedMenu === 'backgrounds') {
+                        setCurrentBackground(link);
+                      } else {
+                        addDecorItem(link);
+                      }
+                    }}
+                  />
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+
+      {/* Main decoration canvas - Christmas border - 30px from bottom */}
+      <div className="w-[100vmin] max-w-3xl aspect-video border-4 border-yellow-500 overflow-hidden absolute bottom-[30px] left-0 right-0 m-auto rounded-2xl shadow-[0_0_30px_rgba(255,215,0,0.3),0_0_60px_rgba(255,0,0,0.2)]">
         <DecorBox
           tree={currentTree}
+          background={currentBackground}
           decorItems={decorItems}
           exportNodeRef={exportNodeRef}
           onDragStop={handleDragStop}
@@ -1280,6 +1428,10 @@ toast.success("All decorations cleared, reverted to default");
           onTouchStart={deleteItemOnDoubleTouch}
           onRotate={handleRotate}
           onResize={handleResize}
+          onTreeDragStop={handleTreeDragStop}
+          onTreeResizeStop={handleTreeResizeStop}
+          onTreeRotate={handleTreeRotate}
+          onTreeResize={handleTreeResize}
         />
       </div>
 

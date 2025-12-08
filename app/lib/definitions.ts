@@ -3,6 +3,14 @@ export type DraggableItem = {
   imageSrc: string;
   x: number; y: number;
   width: number; height: number;
-    rotation: number; // Thêm thuộc tính rotation
+  rotation: number;
+}
 
+export type TreeState = {
+  imageSrc: string;
+  x: number; 
+  y: number;
+  width: number; 
+  height: number;
+  rotation: number;
 }
