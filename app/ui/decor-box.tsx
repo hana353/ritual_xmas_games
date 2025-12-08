@@ -1,7 +1,8 @@
 import DecorItemElement from "@/app/ui/decor-item-element";
 import { DraggableItem, TreeState } from "@/app/lib/definitions";
 import { DraggableEventHandler, DraggableEvent, DraggableData } from "react-draggable";
-import { Rnd, RndResizeCallback, ResizeDirection, ResizableDelta, Position } from "react-rnd";
+import { Rnd, RndResizeCallback, ResizableDelta, Position } from "react-rnd";
+import { ResizeDirection } from "re-resizable";
 import { MouseEventHandler, TouchEventHandler } from "react";
 import { prefix } from "@/app/lib/prefix";
 
