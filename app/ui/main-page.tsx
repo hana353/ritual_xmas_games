@@ -41,6 +41,7 @@ export default function MainPage({
   const [currentBackground, setCurrentBackground] = useState<string | null>(null);
   const [currentMenu, setCurrentMenu] = useState<string[]>([]);
   const [treeSubMenu, setTreeSubMenu] = useState<string[]>([]);
+  const [selectedTreeForVariants, setSelectedTreeForVariants] = useState<string | null>(null);
   const [decorItems, setDecorItems] = useState<DraggableItem[]>([]);
   const [nextId, setNextId] = useState(0);
   const [touchExpiration, setTouchExpiration] = useState(0);
@@ -1298,6 +1299,13 @@ toast.success("All decorations cleared, reverted to default");
             <span className="text-yellow-400 font-bold text-xs md:text-sm">🎄 MENU 🎄</span>
           </div>
           <button
+            className={`christmas-menu-btn m-0.5 md:m-1 px-2 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm flex-shrink-0 ${selectedMenu === 'backgrounds' ? 'active' : ''}`}
+            onClick={() => setSelectedMenu('backgrounds')}
+            aria-pressed={selectedMenu === 'backgrounds'}
+          >
+            🖼️ <span className="hidden sm:inline">Background</span>
+          </button>
+          <button
             className={`christmas-menu-btn m-0.5 md:m-1 px-2 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm flex-shrink-0 ${selectedMenu === 'trees' ? 'active' : ''}`}
             onClick={() => setSelectedMenu('trees')}
             aria-pressed={selectedMenu === 'trees'}
@@ -1324,13 +1332,6 @@ toast.success("All decorations cleared, reverted to default");
             aria-pressed={selectedMenu === 'items'}
           >
             🎁 <span className="hidden sm:inline">Items</span>
-          </button>
-          <button
-            className={`christmas-menu-btn m-0.5 md:m-1 px-2 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm flex-shrink-0 ${selectedMenu === 'backgrounds' ? 'active' : ''}`}
-            onClick={() => setSelectedMenu('backgrounds')}
-            aria-pressed={selectedMenu === 'backgrounds'}
-          >
-            🖼️ <span className="hidden sm:inline">BG</span>
           </button>
           <button
             className={`christmas-menu-btn m-0.5 md:m-1 px-2 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm flex-shrink-0 ${selectedMenu === 'siggy' ? 'active' : ''}`}
@@ -1420,7 +1421,7 @@ toast.success("All decorations cleared, reverted to default");
 
       {/* Mobile item list - bottom, above menu buttons - Christmas themed */}
       <div className="fixed bottom-20 left-0 right-0 z-10 md:hidden">
-        <div className="christmas-item-list max-h-[40vh] overflow-y-auto overflow-x-hidden scrollbar-visible rounded-t-xl mx-2">
+        <div className="christmas-item-list max-h-[40vh] overflow-x-auto overflow-y-hidden scrollbar-visible rounded-t-xl mx-2">
           {/* Title for mobile */}
           <div className="text-center py-2 px-2 border-b-2 border-yellow-500/50 sticky top-0 bg-gradient-to-b from-green-900/95 to-green-800/95 z-10">
             <span className="text-yellow-400 font-bold text-xs">
@@ -1433,20 +1434,26 @@ toast.success("All decorations cleared, reverted to default");
             </span>
           </div>
           <div className="p-2">
-            {/* Tree menu for mobile - grid layout */}
+            {/* Tree menu for mobile - horizontal scroll layout */}
             {selectedMenu === 'trees' && (
               <>
-                <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 mb-2">
+                {/* Main trees - horizontal scroll */}
+                <div className="flex flex-row gap-2 overflow-x-auto pb-2">
                   {treeLinks
                     .filter(link => link.endsWith(".1.png"))
                     .map((link, idx) => {
-                      const treeSubMenuItems = treeLinks.filter(l => l.startsWith(`trees/${idx + 1}`) && (l.split('/').pop() || l) !== `${idx + 1}.1.png`);
+                      const isTreeSelected = currentTrees.some(t => t.imageSrc === link);
+                      const isExpanded = selectedTreeForVariants === link;
+                      
                       return (
                         <button
                           key={link}
-                          className={`christmas-item w-full aspect-square inline-flex items-center justify-center ${currentTrees.some(t => t.imageSrc === link) ? 'selected' : ''}`}
+                          className={`christmas-item w-16 h-16 flex-shrink-0 inline-flex items-center justify-center ${isTreeSelected ? 'selected' : ''} ${isExpanded ? 'ring-2 ring-yellow-400' : ''}`}
                           onClick={() => {
                             addTree(link);
+                            // Toggle: nếu đã expanded thì collapse, nếu chưa thì expand
+                            setSelectedTreeForVariants(isExpanded ? null : link);
+                            const treeSubMenuItems = treeLinks.filter(l => l.startsWith(`trees/${idx + 1}`) && (l.split('/').pop() || l) !== `${idx + 1}.1.png`);
                             setTreeSubMenu(treeSubMenuItems);
                           }}
                         >
@@ -1460,17 +1467,17 @@ toast.success("All decorations cleared, reverted to default");
                     })
                   }
                 </div>
-                {/* Tree submenu variants on mobile - show below in separate section */}
-                {currentTrees.length > 0 && treeSubMenu.length > 0 && (
+                {/* Variants of selected tree - only show when a tree is expanded */}
+                {selectedTreeForVariants && treeSubMenu.length > 0 && (
                   <div className="border-t-2 border-yellow-500/50 pt-2 mt-2">
-                    <div className="text-center mb-2">
-                      <span className="text-yellow-400 font-bold text-xs">Variants:</span>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-yellow-400 font-bold text-xs bg-green-900/50 px-2 py-1 rounded">Variants:</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="flex flex-row gap-2 overflow-x-auto pb-1">
                       {treeSubMenu.map(subLink => (
                         <button
                           key={subLink}
-                          className="christmas-item w-full aspect-square inline-flex items-center justify-center"
+                          className="christmas-item w-16 h-16 flex-shrink-0 inline-flex items-center justify-center"
                           onClick={() => addDecorItem(subLink)}
                         >
                           <img
@@ -1485,11 +1492,11 @@ toast.success("All decorations cleared, reverted to default");
                 )}
               </>
             )}
-            {/* Other items for mobile - grid layout */}
+            {/* Other items for mobile - horizontal scroll layout */}
             {selectedMenu !== 'trees' && (
-              <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
+              <div className="flex flex-row gap-2 overflow-x-auto pb-2">
                 {currentMenu.map(link => (
-                  <div key={link} className="flex items-center justify-center">
+                  <div key={link} className="flex-shrink-0">
                     <DecorItem
                       imageSrc={link}
                       isSelected={selectedMenu === 'backgrounds' && currentBackground === link}
